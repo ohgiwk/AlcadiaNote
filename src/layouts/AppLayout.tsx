@@ -13,6 +13,7 @@ import {
 import { useState } from "react";
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth";
+import { AuthDialog } from "../components/AuthDialog";
 import { IconButton } from "../components/ui";
 const links = [
   ["/home", "ホーム", Compass],
@@ -22,9 +23,10 @@ const links = [
   ["/dashboard", "学習記録", BarChart3],
 ] as const;
 export function AppLayout() {
-  const { user, error: authError, linkGoogle } = useAuth();
+  const { user, error: authError } = useAuth();
   const [menu, setMenu] = useState(false);
   const [palette, setPalette] = useState(false);
+  const [account, setAccount] = useState(false);
   const nav = useNavigate();
   return (
     <div className="app-shell">
@@ -47,10 +49,7 @@ export function AppLayout() {
           <Plus size={18} />
           新しい教科書
         </Link>
-        <button
-          className="profile"
-          onClick={() => user?.isAnonymous && void linkGoogle()}
-        >
+        <button className="profile" onClick={() => setAccount(true)}>
           <div>{!user ? "!" : user.isAnonymous ? "G" : "✓"}</div>
           <span>
             <strong>
@@ -59,8 +58,8 @@ export function AppLayout() {
                   ? "認証設定エラー"
                   : "Firebase未設定"
                 : user.isAnonymous
-                  ? "Googleで保存"
-                  : "Google連携済み"}
+                  ? "ログイン・新規登録"
+                  : "ログイン中"}
             </strong>
             <small>
               {!user
@@ -68,7 +67,7 @@ export function AppLayout() {
                   ? "Authentication設定を確認"
                   : ".env.localを設定してください"
                 : user.isAnonymous
-                  ? "データを引き継げます"
+                  ? null
                   : user.email}
             </small>
           </span>
@@ -114,6 +113,7 @@ export function AppLayout() {
           </div>
         </div>
       )}
+      <AuthDialog open={account} onClose={() => setAccount(false)} />
     </div>
   );
 }

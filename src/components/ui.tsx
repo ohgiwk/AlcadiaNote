@@ -58,17 +58,22 @@ export function Sheet({
   onClose,
   title,
   children,
+  variant = "sheet",
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   children: ReactNode;
+  variant?: "sheet" | "dialog";
 }) {
   if (!open) return null;
   return (
-    <div className="scrim" onMouseDown={onClose}>
+    <div
+      className={`scrim ${variant === "dialog" ? "dialog-scrim" : ""}`}
+      onMouseDown={onClose}
+    >
       <section
-        className="sheet"
+        className={`sheet ${variant === "dialog" ? "dialog-sheet" : ""}`}
         role="dialog"
         aria-modal="true"
         aria-label={title}
