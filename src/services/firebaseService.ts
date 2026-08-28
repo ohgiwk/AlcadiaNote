@@ -25,6 +25,14 @@ export async function createTextbook(input: TextbookGenerationInput) {
     )(input)
   ).data;
 }
+export async function approveTextbookOutline(jobId: string) {
+  return (
+    await httpsCallable<{ jobId: string }, { approved: boolean }>(
+      functions,
+      "approveTextbookOutline",
+    )({ jobId })
+  ).data;
+}
 export async function askPageQuestion(input: AIConversationRequest) {
   return (
     await httpsCallable<AIConversationRequest, { answer: string }>(

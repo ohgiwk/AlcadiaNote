@@ -72,6 +72,46 @@ const flashcard = {
   required: ["front", "back"],
   properties: { front: { type: "string" }, back: { type: "string" } },
 } as const;
+const outlinePage = {
+  type: "object",
+  additionalProperties: false,
+  required: ["title", "summary"],
+  properties: {
+    title: { type: "string" },
+    summary: { type: "string" },
+  },
+} as const;
+const outlineChapter = {
+  type: "object",
+  additionalProperties: false,
+  required: ["title", "summary", "pages"],
+  properties: {
+    title: { type: "string" },
+    summary: { type: "string" },
+    pages: {
+      type: "array",
+      minItems: 3,
+      maxItems: 3,
+      items: outlinePage,
+    },
+  },
+} as const;
+export const textbookOutlineSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["title", "subtitle", "category", "chapters"],
+  properties: {
+    title: { type: "string" },
+    subtitle: { type: "string" },
+    category: { type: "string" },
+    chapters: {
+      type: "array",
+      minItems: 4,
+      maxItems: 4,
+      items: outlineChapter,
+    },
+  },
+} as const;
 export const textbookSchema = {
   type: "object",
   additionalProperties: false,

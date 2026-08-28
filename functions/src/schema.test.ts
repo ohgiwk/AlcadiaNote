@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { textbookSchema } from "./schema.js";
+import { textbookOutlineSchema, textbookSchema } from "./schema.js";
+
+test("outline schema requires exactly four chapters and three pages", () => {
+  const chapters = textbookOutlineSchema.properties.chapters;
+  assert.equal(chapters.minItems, 4);
+  assert.equal(chapters.maxItems, 4);
+  assert.equal(chapters.items.properties.pages.minItems, 3);
+  assert.equal(chapters.items.properties.pages.maxItems, 3);
+});
 
 test("textbook schema requires exactly four chapters and three pages", () => {
   const chapters = textbookSchema.properties.chapters;

@@ -4,12 +4,18 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../auth";
 import { useDocument } from "../hooks/useFirestoreData";
 import { firebaseConfigured } from "../firebase";
-import { createTextbook } from "../services/firebaseService";
+import {
+  approveTextbookOutline,
+  createTextbook,
+} from "../services/firebaseService";
 import type { GenerationJob, TextbookGenerationInput } from "../types/models";
+import { withoutInlineLinks } from "../utils/text";
 const labels: Record<string, string> = {
   queued: "準備しています",
   researching: "信頼できる情報源を調査しています",
   outlining: "学習ロードマップを設計しています",
+  awaiting_approval: "ロードマップの確認を待っています",
+  approved: "本文生成を開始しています",
   writing: "章とページを書いています",
   finalizing: "問題とカードを仕上げています",
   completed: "完成しました",
@@ -48,6 +54,7 @@ export function CreatePage() {
   const [jobId, setJobId] = useState(() => searchParams.get("job") ?? "");
   const [clock, setClock] = useState(0);
   const [error, setError] = useState("");
+  const [approving, setApproving] = useState(false);
   const nav = useNavigate();
   const { data: job, loading: jobLoading } = useDocument<GenerationJob>(
     jobId ? `generationJobs/${jobId}` : undefined,
@@ -84,10 +91,28 @@ export function CreatePage() {
       setError(e instanceof Error ? e.message : "生成を開始できませんでした");
     }
   }
+  async function approveOutline() {
+    setError("");
+    setApproving(true);
+    try {
+      await approveTextbookOutline(jobId);
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "承認を受け付けられませんでした",
+      );
+    } finally {
+      setApproving(false);
+    }
+  }
   if (jobId) {
     const status = job?.status ?? "queued";
     const progress = job?.progress ?? 0;
-    const displayedStage = status === "failed" ? job?.failedAtStage : status;
+    const displayedStage =
+      status === "failed"
+        ? job?.failedAtStage
+        : status === "approved"
+          ? "writing"
+          : status;
     const activeStage = generationStages.findIndex(
       (stage) => stage.status === displayedStage,
     );
@@ -98,6 +123,66 @@ export function CreatePage() {
     const elapsed = Number.isFinite(startedAtTime)
       ? Math.max(0, Math.floor((clock - startedAtTime) / 1000))
       : Math.max(0, job?.elapsedSeconds ?? 0);
+    if (status === "awaiting_approval" && job?.outline) {
+      return (
+        <div className="page outline-review" aria-live="polite">
+          <header className="outline-review-header">
+            <span className="eyebrow">REVIEW THE ROADMAP</span>
+            <h1>{withoutInlineLinks(job.outline.title)}</h1>
+            <p>{withoutInlineLinks(job.outline.subtitle)}</p>
+            <div className="generation-conditions">
+              <span>難易度：{job.input.level}</span>
+              <span>目的：{job.input.purpose}</span>
+              <span>全4章・12ページ</span>
+            </div>
+          </header>
+          <section className="outline-review-list">
+            {job.outline.chapters.map((chapter, chapterIndex) => (
+              <article
+                className="outline-chapter"
+                key={`${chapterIndex}-${chapter.title}`}
+              >
+                <div className="outline-chapter-number">{chapterIndex + 1}</div>
+                <div>
+                  <h2>{withoutInlineLinks(chapter.title)}</h2>
+                  <p>{withoutInlineLinks(chapter.summary)}</p>
+                  <ol>
+                    {chapter.pages.map((page, pageIndex) => (
+                      <li key={`${pageIndex}-${page.title}`}>
+                        <strong>{withoutInlineLinks(page.title)}</strong>
+                        <span>{withoutInlineLinks(page.summary)}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              </article>
+            ))}
+          </section>
+          {error && <p className="error">{error}</p>}
+          <div className="outline-review-actions">
+            <button
+              type="button"
+              className="button secondary"
+              onClick={() => nav("/library")}
+            >
+              あとで確認する
+            </button>
+            <button
+              type="button"
+              className="button primary"
+              disabled={approving}
+              onClick={approveOutline}
+            >
+              {approving ? "承認中…" : "この構成で本文を生成"}
+              {!approving && <ChevronRight size={18} />}
+            </button>
+          </div>
+          <p className="outline-review-note">
+            承認するまで本文生成は開始されません。目次は本棚から再度確認できます。
+          </p>
+        </div>
+      );
+    }
     return (
       <div className="generation" aria-live="polite">
         <section className="generation-card">

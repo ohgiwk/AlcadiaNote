@@ -8,6 +8,8 @@ export type GenerationStatus =
   | "queued"
   | "researching"
   | "outlining"
+  | "awaiting_approval"
+  | "approved"
   | "writing"
   | "finalizing"
   | "completed"
@@ -35,6 +37,23 @@ export interface GenerationJob extends BaseEntity {
   errorCode?: string;
   failedAtStage?: GenerationStatus;
   firstPageId?: ID;
+  outline?: TextbookOutline;
+  approvedAt?: string;
+}
+export interface TextbookOutlinePage {
+  title: string;
+  summary: string;
+}
+export interface TextbookOutlineChapter {
+  title: string;
+  summary: string;
+  pages: TextbookOutlinePage[];
+}
+export interface TextbookOutline {
+  title: string;
+  subtitle: string;
+  category: string;
+  chapters: TextbookOutlineChapter[];
 }
 export type ContentBlock =
   | { id: ID; type: "heading"; text: string; level: 2 | 3 }
@@ -91,6 +110,7 @@ export interface Textbook extends BaseEntity {
   level?: TextbookGenerationInput["level"];
   purpose?: TextbookGenerationInput["purpose"];
   sourceTextbookId?: ID;
+  generationJobId?: ID;
 }
 export interface Quiz extends BaseEntity {
   pageId: ID;

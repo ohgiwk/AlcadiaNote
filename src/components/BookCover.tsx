@@ -16,11 +16,17 @@ export function BookCover({
   deleting?: boolean;
 }) {
   const ready = book.generationStatus === "completed" && book.firstPageId;
+  const needsApproval =
+    book.generationStatus === "awaiting_approval" && book.generationJobId;
   return (
     <article className="book-card-container">
       <Link
         to={
-          ready ? `/textbooks/${book.id}/read/${book.firstPageId}` : "/library"
+          ready
+            ? `/textbooks/${book.id}/read/${book.firstPageId}`
+            : needsApproval
+              ? `/create?job=${book.generationJobId}`
+              : "/library"
         }
         className={`book-card ${compact ? "compact" : ""}`}
       >
@@ -33,9 +39,11 @@ export function BookCover({
             <p>
               {book.generationStatus === "failed"
                 ? "生成に失敗しました"
-                : book.generationStatus !== "completed"
-                  ? "生成中…"
-                  : book.subtitle}
+                : book.generationStatus === "awaiting_approval"
+                  ? "ロードマップを確認してください"
+                  : book.generationStatus !== "completed"
+                    ? "生成中…"
+                    : book.subtitle}
             </p>
           </div>
           {book.favorite && (
@@ -48,7 +56,9 @@ export function BookCover({
           <span>
             {book.generationStatus === "completed"
               ? `${book.progress}% 読了`
-              : "生成状況を確認中"}
+              : book.generationStatus === "awaiting_approval"
+                ? "構成の確認待ち"
+                : "生成状況を確認中"}
           </span>
           <Progress value={book.progress} />
         </div>
@@ -72,7 +82,9 @@ export function BookCover({
               className="book-delete"
               disabled={
                 deleting ||
-                !["completed", "failed"].includes(book.generationStatus ?? "")
+                !["completed", "failed", "awaiting_approval"].includes(
+                  book.generationStatus ?? "",
+                )
               }
               onClick={onDelete}
               aria-label={`${book.title}を削除`}

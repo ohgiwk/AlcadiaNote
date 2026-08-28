@@ -3,9 +3,12 @@ import { initializeApp } from "firebase-admin/app";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { setGlobalOptions } from "firebase-functions/v2";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
-import { onDocumentCreated } from "firebase-functions/v2/firestore";
+import {
+  onDocumentCreated,
+  onDocumentUpdated,
+} from "firebase-functions/v2/firestore";
 import { defineSecret, defineString } from "firebase-functions/params";
-import { textbookSchema } from "./schema.js";
+import { textbookOutlineSchema, textbookSchema } from "./schema.js";
 import { withoutInlineLinks } from "./sanitize.js";
 
 initializeApp();
@@ -75,6 +78,7 @@ export const createTextbook = onCall(
         favorite: false,
         chapterIds: [],
         generationStatus: "queued",
+        generationJobId: job.id,
         firstPageId: null,
         createdAt: now,
         updatedAt: now,
@@ -108,8 +112,11 @@ function outputText(response: any) {
     .map((c: any) => c.text)
     .join("");
 }
-async function generate(input: any) {
-  const prompt = `日本語の学習用教科書を作成してください。テーマ: ${input.topic}\n難易度: ${input.level}\n目的: ${input.purpose}\n正確性を優先し、web_searchで信頼できる情報源を調査してください。4章、各章3ページ。各ページに理解確認問題を1問、全体に暗記カードを8枚以上含めてください。本文blocksにはURL、Markdownリンク、出典の括弧書きを含めず、参照情報はsourcesだけに格納してください。blocksの未使用フィールドは空文字または空配列にしてください。`;
+async function structuredGeneration(
+  prompt: string,
+  name: string,
+  schema: object,
+) {
   const res = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
@@ -123,9 +130,9 @@ async function generate(input: any) {
       text: {
         format: {
           type: "json_schema",
-          name: "textbook",
+          name,
           strict: true,
-          schema: textbookSchema,
+          schema,
         },
       },
     }),
@@ -135,6 +142,33 @@ async function generate(input: any) {
   const text = outputText(json);
   if (!text) throw new Error("empty_model_output");
   return JSON.parse(text);
+}
+async function generateOutline(input: any) {
+  const outline = await structuredGeneration(
+    `日本語の学習用教科書のロードマップと目次だけを作成してください。テーマ: ${input.topic}\n難易度: ${input.level}\n目的: ${input.purpose}\n正確性を優先し、web_searchで信頼できる情報源を調査してください。全4章、各章3ページとし、章とページごとに、これから本文で扱う内容が判断できる具体的な要約を付けてください。タイトル・要約にはURL、Markdownリンク、ドメイン名や出典の括弧書きを含めないでください。本文、問題、暗記カードはまだ作成しないでください。`,
+    "textbook_outline",
+    textbookOutlineSchema,
+  );
+  return {
+    title: withoutInlineLinks(outline.title),
+    subtitle: withoutInlineLinks(outline.subtitle),
+    category: withoutInlineLinks(outline.category),
+    chapters: outline.chapters.map((chapter: any) => ({
+      title: withoutInlineLinks(chapter.title),
+      summary: withoutInlineLinks(chapter.summary),
+      pages: chapter.pages.map((page: any) => ({
+        title: withoutInlineLinks(page.title),
+        summary: withoutInlineLinks(page.summary),
+      })),
+    })),
+  };
+}
+async function generateTextbook(input: any, outline: any) {
+  return structuredGeneration(
+    `承認済みのロードマップに厳密に従って、日本語の学習用教科書本文を作成してください。テーマ: ${input.topic}\n難易度: ${input.level}\n目的: ${input.purpose}\n承認済みロードマップ: ${JSON.stringify(outline)}\nタイトル、章名、ページ名と順序は変更しないでください。web_searchで信頼できる情報源を確認し、各ページに理解確認問題を1問、全体に暗記カードを8枚以上含めてください。本文blocksにはURL、Markdownリンク、出典の括弧書きを含めず、参照情報はsourcesだけに格納してください。blocksの未使用フィールドは空文字または空配列にしてください。`,
+    "textbook",
+    textbookSchema,
+  );
 }
 function block(raw: any) {
   const id = crypto.randomUUID();
@@ -219,7 +253,7 @@ async function updateGenerationStage(
   ]);
 }
 
-export const processTextbook = onDocumentCreated(
+export const processTextbookOutline = onDocumentCreated(
   {
     document: "generationJobs/{jobId}",
     timeoutSeconds: 540,
@@ -237,33 +271,42 @@ export const processTextbook = onDocumentCreated(
     let heartbeatWrite: Promise<unknown> = Promise.resolve();
     let currentStage = "queued";
     try {
+      const claimed = await db.runTransaction(async (tx) => {
+        const current = await tx.get(jobRef);
+        if (current.data()?.status !== "queued") return false;
+        tx.update(jobRef, {
+          status: "researching",
+          progress: 8,
+          stageDetail: "AIがWebを調査し、教科書の構成を考えています",
+          startedAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        tx.update(bookRef, {
+          generationStatus: "researching",
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        return true;
+      });
+      if (!claimed) return;
       currentStage = "researching";
-      await updateGenerationStage(
-        jobRef,
-        bookRef,
-        "researching",
-        8,
-        "AIがWebを調査し、教科書の構成を考えています",
-      );
-      await jobRef.update({ startedAt: FieldValue.serverTimestamp() });
       const researchStartedAt = Date.now();
       researchHeartbeat = setInterval(() => {
         const elapsedSeconds = Math.floor(
           (Date.now() - researchStartedAt) / 1000,
         );
-        const progress = Math.min(38, 8 + Math.floor(elapsedSeconds / 15) * 3);
+        const progress = Math.min(28, 8 + Math.floor(elapsedSeconds / 15) * 3);
         heartbeatWrite = heartbeatWrite
           .then(() =>
             jobRef.update({
               progress,
               elapsedSeconds,
-              stageDetail: "AIが情報源を調査し、章立てと本文を生成しています",
+              stageDetail: "AIが情報源を調査し、ロードマップを設計しています",
               updatedAt: FieldValue.serverTimestamp(),
             }),
           )
           .catch((error) => console.warn("generation_heartbeat_failed", error));
       }, 15000);
-      const result = await generate(job.input);
+      const outline = await generateOutline(job.input);
       clearInterval(researchHeartbeat);
       researchHeartbeat = undefined;
       await heartbeatWrite;
@@ -272,19 +315,133 @@ export const processTextbook = onDocumentCreated(
         jobRef,
         bookRef,
         "outlining",
-        42,
-        "生成結果の章立てと12ページの構成を確認しています",
+        30,
+        "4章・12ページの構成を確認しています",
       );
+      await Promise.all([
+        jobRef.update({
+          status: "awaiting_approval",
+          progress: 35,
+          stageDetail: "ロードマップと目次を確認してください",
+          outline,
+          outlineReadyAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        }),
+        bookRef.update({
+          title: outline.title,
+          subtitle: outline.subtitle,
+          category: outline.category,
+          generationStatus: "awaiting_approval",
+          updatedAt: FieldValue.serverTimestamp(),
+        }),
+      ]);
+      return;
+    } catch (error) {
+      if (researchHeartbeat) clearInterval(researchHeartbeat);
+      await heartbeatWrite;
+      console.error("outline_generation_failed", error);
+      await Promise.all([
+        jobRef.update({
+          status: "failed",
+          active: false,
+          errorCode: "OUTLINE_GENERATION_FAILED",
+          failedAtStage: currentStage,
+          stageDetail: "ロードマップの生成中に問題が発生しました",
+          updatedAt: FieldValue.serverTimestamp(),
+        }),
+        bookRef.update({
+          generationStatus: "failed",
+          updatedAt: FieldValue.serverTimestamp(),
+        }),
+      ]);
+    }
+  },
+);
+
+export const approveTextbookOutline = onCall(
+  { enforceAppCheck: false },
+  async (request) => {
+    if (!request.auth)
+      throw new HttpsError("unauthenticated", "ログインが必要です");
+    const jobId = String(request.data?.jobId ?? "");
+    if (!/^[A-Za-z0-9_-]{1,128}$/.test(jobId))
+      throw new HttpsError("invalid-argument", "生成ジョブIDが不正です");
+    const jobRef = db.doc(`generationJobs/${jobId}`);
+    await db.runTransaction(async (tx) => {
+      const job = await tx.get(jobRef);
+      if (!job.exists || job.data()?.ownerId !== request.auth!.uid)
+        throw new HttpsError("permission-denied", "承認する権限がありません");
+      if (job.data()?.status !== "awaiting_approval")
+        throw new HttpsError(
+          "failed-precondition",
+          "このロードマップは承認できません",
+        );
+      if (!job.data()?.outline)
+        throw new HttpsError("failed-precondition", "ロードマップがありません");
+      const bookRef = db.doc(`textbooks/${job.data()!.textbookId}`);
+      tx.update(jobRef, {
+        status: "approved",
+        progress: 40,
+        stageDetail: "承認を受け付けました。本文生成を開始します",
+        approvedAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      tx.update(bookRef, {
+        generationStatus: "approved",
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    });
+    return { approved: true };
+  },
+);
+
+export const processTextbookContent = onDocumentUpdated(
+  {
+    document: "generationJobs/{jobId}",
+    timeoutSeconds: 540,
+    memory: "1GiB",
+    secrets: [openAiKey],
+    retry: false,
+  },
+  async (event) => {
+    if (
+      event.data?.before.data()?.status !== "awaiting_approval" ||
+      event.data?.after.data()?.status !== "approved"
+    )
+      return;
+    const jobRef = event.data.after.ref;
+    const claimed = await db.runTransaction(async (tx) => {
+      const current = await tx.get(jobRef);
+      if (current.data()?.status !== "approved") return undefined;
+      tx.update(jobRef, {
+        status: "writing",
+        progress: 44,
+        stageDetail: "承認済みの構成に沿って本文を生成しています",
+        contentStartedAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      return current.data();
+    });
+    if (!claimed) return;
+    const bookRef = db.doc(`textbooks/${claimed.textbookId}`);
+    let currentStage = "writing";
+    try {
+      await bookRef.update({
+        generationStatus: "writing",
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      const result = await generateTextbook(claimed.input, claimed.outline);
       const chapterIds: string[] = [];
       let firstPageId: string | undefined;
       const batch = db.batch();
       for (const [ci, c] of result.chapters.entries()) {
+        const approvedChapter = claimed.outline.chapters[ci];
         currentStage = "writing";
         await updateGenerationStage(
           jobRef,
           bookRef,
           "writing",
-          52 + ci * 9,
+          52 + ci * 8,
           `第${ci + 1}章のページと確認問題を保存しています`,
         );
         const chapterRef = bookRef.collection("chapters").doc();
@@ -296,7 +453,7 @@ export const processTextbook = onDocumentCreated(
           pageIds.push(pageRef.id);
           batch.set(pageRef, {
             chapterId: chapterRef.id,
-            title: p.title,
+            title: approvedChapter.pages[pi].title,
             order: ci * 3 + pi + 1,
             readMinutes: p.readMinutes,
             blocks: p.blocks.map(block),
@@ -317,7 +474,7 @@ export const processTextbook = onDocumentCreated(
         }
         batch.set(chapterRef, {
           textbookId: bookRef.id,
-          title: c.title,
+          title: approvedChapter.title,
           order: ci + 1,
           pageIds,
           progress: 0,
@@ -349,9 +506,9 @@ export const processTextbook = onDocumentCreated(
         updatedAt: FieldValue.serverTimestamp(),
       });
       batch.update(bookRef, {
-        title: result.title,
-        subtitle: result.subtitle,
-        category: result.category,
+        title: claimed.outline.title,
+        subtitle: claimed.outline.subtitle,
+        category: claimed.outline.category,
         chapterIds,
         firstPageId,
         generationStatus: "completed",
@@ -367,8 +524,6 @@ export const processTextbook = onDocumentCreated(
       });
       await batch.commit();
     } catch (error) {
-      if (researchHeartbeat) clearInterval(researchHeartbeat);
-      await heartbeatWrite;
       console.error("generation_failed", error);
       await Promise.all([
         jobRef.update({
@@ -403,9 +558,14 @@ export const deleteTextbook = onCall(
     if (book.data()?.ownerId !== request.auth.uid)
       throw new HttpsError("permission-denied", "削除する権限がありません");
     if (
-      ["queued", "researching", "outlining", "writing", "finalizing"].includes(
-        book.data()?.generationStatus,
-      )
+      [
+        "queued",
+        "researching",
+        "outlining",
+        "approved",
+        "writing",
+        "finalizing",
+      ].includes(book.data()?.generationStatus)
     )
       throw new HttpsError(
         "failed-precondition",

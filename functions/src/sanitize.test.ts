@@ -26,3 +26,12 @@ test("removes naked URLs", () => {
     "出典 を確認。",
   );
 });
+
+test("removes a web-search citation from an outline summary", () => {
+  assert.equal(
+    withoutInlineLinks(
+      "技術の変化を整理する。 ([bidhannagarcollege.org](https://www.bidhannagarcollege.org/source.pdf?utm_source=openai))",
+    ),
+    "技術の変化を整理する。",
+  );
+});
