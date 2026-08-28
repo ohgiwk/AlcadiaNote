@@ -21,6 +21,7 @@ export interface TextbookGenerationInput {
   topic: string;
   level: "初心者" | "中級" | "上級" | "AIに任せる";
   purpose: "趣味" | "仕事" | "資格" | "教養";
+  sourceTextbookId?: ID;
 }
 export interface GenerationJob extends BaseEntity {
   ownerId: ID;
@@ -83,6 +84,9 @@ export interface Textbook extends BaseEntity {
   generationStatus?: GenerationStatus;
   firstPageId?: ID;
   topic?: string;
+  level?: TextbookGenerationInput["level"];
+  purpose?: TextbookGenerationInput["purpose"];
+  sourceTextbookId?: ID;
 }
 export interface Quiz extends BaseEntity {
   pageId: ID;

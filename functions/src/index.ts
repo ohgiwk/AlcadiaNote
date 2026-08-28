@@ -19,9 +19,10 @@ export const createTextbook = onCall(
   async (request) => {
     if (!request.auth)
       throw new HttpsError("unauthenticated", "ログインが必要です");
-    const topic = String(request.data?.topic ?? "").trim();
+    let topic = String(request.data?.topic ?? "").trim();
     const level = String(request.data?.level ?? "");
     const purpose = String(request.data?.purpose ?? "");
+    const sourceTextbookId = String(request.data?.sourceTextbookId ?? "");
     if (
       topic.length < 2 ||
       topic.length > 300 ||
@@ -29,6 +30,24 @@ export const createTextbook = onCall(
       !allowedPurposes.includes(purpose)
     )
       throw new HttpsError("invalid-argument", "入力内容を確認してください");
+    if (sourceTextbookId && !/^[A-Za-z0-9_-]{1,128}$/.test(sourceTextbookId))
+      throw new HttpsError("invalid-argument", "再生成元のIDが不正です");
+    if (sourceTextbookId) {
+      const source = await db.doc(`textbooks/${sourceTextbookId}`).get();
+      if (!source.exists || source.data()?.ownerId !== request.auth.uid)
+        throw new HttpsError(
+          "permission-denied",
+          "この教科書は再生成できません",
+        );
+      if (source.data()?.generationStatus !== "completed")
+        throw new HttpsError(
+          "failed-precondition",
+          "完成済みの教科書だけ再生成できます",
+        );
+      topic = String(
+        source.data()?.topic || source.data()?.title || topic,
+      ).trim();
+    }
     const active = await db
       .collection("generationJobs")
       .where("ownerId", "==", request.auth.uid)
@@ -44,6 +63,9 @@ export const createTextbook = onCall(
       tx.set(book, {
         ownerId: request.auth!.uid,
         topic,
+        level,
+        purpose,
+        ...(sourceTextbookId ? { sourceTextbookId } : {}),
         title: topic,
         subtitle: "生成中…",
         category: "AI教科書",
@@ -59,7 +81,12 @@ export const createTextbook = onCall(
       tx.set(job, {
         ownerId: request.auth!.uid,
         textbookId: book.id,
-        input: { topic, level, purpose },
+        input: {
+          topic,
+          level,
+          purpose,
+          ...(sourceTextbookId ? { sourceTextbookId } : {}),
+        },
         status: "queued",
         progress: 0,
         active: true,

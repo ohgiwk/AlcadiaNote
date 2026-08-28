@@ -1,6 +1,6 @@
 import { BookOpen, Check, ChevronRight, Sparkles } from "lucide-react";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth";
 import { useDocument } from "../hooks/useFirestoreData";
 import { firebaseConfigured } from "../firebase";
@@ -16,12 +16,19 @@ const labels: Record<string, string> = {
   failed: "生成に失敗しました",
 };
 export function CreatePage() {
+  const location = useLocation();
+  const regeneration =
+    location.state as Partial<TextbookGenerationInput> | null;
   const { user, error: authError } = useAuth();
-  const [topic, setTopic] = useState("産業革命と近代社会");
-  const [level, setLevel] =
-    useState<TextbookGenerationInput["level"]>("AIに任せる");
-  const [purpose, setPurpose] =
-    useState<TextbookGenerationInput["purpose"]>("教養");
+  const [topic, setTopic] = useState(
+    regeneration?.topic ?? "産業革命と近代社会",
+  );
+  const [level, setLevel] = useState<TextbookGenerationInput["level"]>(
+    regeneration?.level ?? "AIに任せる",
+  );
+  const [purpose, setPurpose] = useState<TextbookGenerationInput["purpose"]>(
+    regeneration?.purpose ?? "教養",
+  );
   const [jobId, setJobId] = useState("");
   const [error, setError] = useState("");
   const nav = useNavigate();
@@ -35,6 +42,7 @@ export function CreatePage() {
         topic: topic.trim(),
         level,
         purpose,
+        sourceTextbookId: regeneration?.sourceTextbookId,
       });
       setJobId(result.jobId);
     } catch (e) {
@@ -104,8 +112,16 @@ export function CreatePage() {
           <Sparkles />
         </div>
         <span className="eyebrow">CREATE WITH AI</span>
-        <h1>次は、何を学びますか？</h1>
-        <p>ひとつのテーマから、あなただけの教科書を育てます。</p>
+        <h1>
+          {regeneration?.sourceTextbookId
+            ? "どんな学び方に変えますか？"
+            : "次は、何を学びますか？"}
+        </h1>
+        <p>
+          {regeneration?.sourceTextbookId
+            ? "元の一冊を残したまま、難易度と目的を変えて新しい版を作ります。"
+            : "ひとつのテーマから、あなただけの教科書を育てます。"}
+        </p>
       </div>
       <section className="create-form">
         <label className="topic-label">
@@ -114,9 +130,14 @@ export function CreatePage() {
             maxLength={300}
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
+            readOnly={Boolean(regeneration?.sourceTextbookId)}
             placeholder="例：産業革命は社会をどう変えた？"
           />
-          <small>テーマ、疑問、目標など、自由に書いてください。</small>
+          <small>
+            {regeneration?.sourceTextbookId
+              ? "再生成では元の教科書と同じテーマを引き継ぎます。"
+              : "テーマ、疑問、目標など、自由に書いてください。"}
+          </small>
         </label>
         <fieldset>
           <legend>難易度</legend>
@@ -165,7 +186,9 @@ export function CreatePage() {
           onClick={() => void generate()}
         >
           <Sparkles />
-          教科書を生成する
+          {regeneration?.sourceTextbookId
+            ? "この条件で再生成する"
+            : "教科書を生成する"}
           <ChevronRight />
         </button>
         <p className="form-note">

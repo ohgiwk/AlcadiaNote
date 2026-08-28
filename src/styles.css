@@ -366,9 +366,15 @@ a {
 .book-card-container {
   min-width: 0;
 }
-.book-delete {
-  width: 100%;
+.book-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
   margin-top: 10px;
+}
+.book-delete,
+.book-regenerate {
+  width: 100%;
   padding: 8px 12px;
   border: 1px solid #d9c9c5;
   border-radius: 7px;
@@ -380,12 +386,25 @@ a {
   gap: 7px;
   cursor: pointer;
 }
+.book-regenerate {
+  border-color: #b9c9df;
+  color: #2f578d;
+}
 .book-delete:hover:not(:disabled) {
   background: #fff3f0;
 }
-.book-delete:disabled {
+.book-regenerate:hover:not(:disabled) {
+  background: #f1f6fd;
+}
+.book-delete:disabled,
+.book-regenerate:disabled {
   cursor: not-allowed;
   opacity: 0.48;
+}
+.topic-label textarea:read-only {
+  background: #f3f4f6;
+  color: var(--muted);
+  cursor: not-allowed;
 }
 .book-cover {
   aspect-ratio: 3/4;

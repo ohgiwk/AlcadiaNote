@@ -1,13 +1,15 @@
 import { where } from "firebase/firestore";
 import { Search, SlidersHorizontal } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth";
 import { BookCover } from "../components/BookCover";
 import { useCollection } from "../hooks/useFirestoreData";
 import { deleteTextbook } from "../services/firebaseService";
-import type { Textbook } from "../types/models";
+import type { Textbook, TextbookGenerationInput } from "../types/models";
 export function LibraryPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState("すべて");
   const [deletingId, setDeletingId] = useState("");
@@ -97,6 +99,16 @@ export function LibraryPage() {
               key={x.id}
               book={x}
               deleting={deletingId === x.id}
+              onRegenerate={() =>
+                navigate("/create", {
+                  state: {
+                    topic: x.topic ?? x.title,
+                    level: x.level ?? "AIに任せる",
+                    purpose: x.purpose ?? "教養",
+                    sourceTextbookId: x.id,
+                  } satisfies TextbookGenerationInput,
+                })
+              }
               onDelete={() => void remove(x)}
             />
           ))}

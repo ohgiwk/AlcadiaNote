@@ -7,6 +7,7 @@ import {
   List,
   MoreHorizontal,
   NotebookPen,
+  RefreshCw,
   Search,
   Settings2,
   Sparkles,
@@ -85,6 +86,19 @@ export function ReaderPage() {
             <IconButton label="AIチャット" onClick={() => setAi(true)}>
               <Sparkles size={19} />
             </IconButton>
+            <Link
+              className="icon-button"
+              aria-label="条件を変えて再生成"
+              to="/create"
+              state={{
+                topic: book.topic ?? book.title,
+                level: book.level ?? "AIに任せる",
+                purpose: book.purpose ?? "教養",
+                sourceTextbookId: book.id,
+              }}
+            >
+              <RefreshCw size={19} />
+            </Link>
             <IconButton label="表示設定">
               <Settings2 size={19} />
             </IconButton>

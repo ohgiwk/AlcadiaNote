@@ -1,4 +1,4 @@
-import { BookOpen, Heart, Trash2 } from "lucide-react";
+import { BookOpen, Heart, RefreshCw, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { Textbook } from "../types/models";
 import { Progress } from "./ui";
@@ -6,11 +6,13 @@ export function BookCover({
   book,
   compact = false,
   onDelete,
+  onRegenerate,
   deleting = false,
 }: {
   book: Textbook;
   compact?: boolean;
   onDelete?: () => void;
+  onRegenerate?: () => void;
   deleting?: boolean;
 }) {
   const ready = book.generationStatus === "completed" && book.firstPageId;
@@ -51,20 +53,35 @@ export function BookCover({
           <Progress value={book.progress} />
         </div>
       </Link>
-      {onDelete && (
-        <button
-          type="button"
-          className="book-delete"
-          disabled={
-            deleting ||
-            !["completed", "failed"].includes(book.generationStatus ?? "")
-          }
-          onClick={onDelete}
-          aria-label={`${book.title}を削除`}
-        >
-          <Trash2 size={16} />
-          {deleting ? "削除中…" : "削除"}
-        </button>
+      {(onRegenerate || onDelete) && (
+        <div className="book-actions">
+          {onRegenerate && (
+            <button
+              type="button"
+              className="book-regenerate"
+              disabled={book.generationStatus !== "completed"}
+              onClick={onRegenerate}
+            >
+              <RefreshCw size={16} />
+              条件を変えて再生成
+            </button>
+          )}
+          {onDelete && (
+            <button
+              type="button"
+              className="book-delete"
+              disabled={
+                deleting ||
+                !["completed", "failed"].includes(book.generationStatus ?? "")
+              }
+              onClick={onDelete}
+              aria-label={`${book.title}を削除`}
+            >
+              <Trash2 size={16} />
+              {deleting ? "削除中…" : "削除"}
+            </button>
+          )}
+        </div>
       )}
     </article>
   );
