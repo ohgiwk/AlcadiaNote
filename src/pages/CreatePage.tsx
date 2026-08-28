@@ -1,6 +1,6 @@
-import { BookOpen, Check, ChevronRight, Sparkles } from "lucide-react";
-import { useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { BookOpen, Check, ChevronRight, Clock3, Sparkles } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../auth";
 import { useDocument } from "../hooks/useFirestoreData";
 import { firebaseConfigured } from "../firebase";
@@ -15,6 +15,21 @@ const labels: Record<string, string> = {
   completed: "完成しました",
   failed: "生成に失敗しました",
 };
+const generationStages = [
+  { status: "researching", label: labels.researching },
+  { status: "outlining", label: labels.outlining },
+  { status: "writing", label: labels.writing },
+  { status: "finalizing", label: labels.finalizing },
+] as const;
+
+function formatElapsed(seconds: number) {
+  const minutes = Math.floor(seconds / 60);
+  const rest = seconds % 60;
+  return minutes
+    ? `${minutes}分${rest.toString().padStart(2, "0")}秒`
+    : `${rest}秒`;
+}
+
 export function CreatePage() {
   const location = useLocation();
   const regeneration =
@@ -29,12 +44,31 @@ export function CreatePage() {
   const [purpose, setPurpose] = useState<TextbookGenerationInput["purpose"]>(
     regeneration?.purpose ?? "教養",
   );
-  const [jobId, setJobId] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [jobId, setJobId] = useState(() => searchParams.get("job") ?? "");
+  const [clock, setClock] = useState(0);
   const [error, setError] = useState("");
   const nav = useNavigate();
-  const { data: job } = useDocument<GenerationJob>(
+  const { data: job, loading: jobLoading } = useDocument<GenerationJob>(
     jobId ? `generationJobs/${jobId}` : undefined,
   );
+  useEffect(() => {
+    if (!jobId) return;
+    const initialTimer = window.setTimeout(() => setClock(Date.now()), 0);
+    const timer = window.setInterval(() => setClock(Date.now()), 1000);
+    return () => {
+      window.clearTimeout(initialTimer);
+      window.clearInterval(timer);
+    };
+  }, [jobId]);
+  useEffect(() => {
+    if (job?.status !== "completed" || !job.firstPageId) return;
+    const timer = window.setTimeout(
+      () => nav(`/textbooks/${job.textbookId}/read/${job.firstPageId}`),
+      900,
+    );
+    return () => window.clearTimeout(timer);
+  }, [job, nav]);
   async function generate() {
     setError("");
     try {
@@ -45,62 +79,113 @@ export function CreatePage() {
         sourceTextbookId: regeneration?.sourceTextbookId,
       });
       setJobId(result.jobId);
+      setSearchParams({ job: result.jobId }, { replace: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : "生成を開始できませんでした");
     }
   }
   if (jobId) {
-    if (job?.status === "completed" && job.firstPageId)
-      setTimeout(
-        () => nav(`/textbooks/${job.textbookId}/read/${job.firstPageId}`),
-        400,
-      );
+    const status = job?.status ?? "queued";
+    const progress = job?.progress ?? 0;
+    const displayedStage = status === "failed" ? job?.failedAtStage : status;
+    const activeStage = generationStages.findIndex(
+      (stage) => stage.status === displayedStage,
+    );
+    const startedAt = job?.startedAt || job?.createdAt;
+    const startedAtTime = startedAt
+      ? new Date(startedAt).getTime()
+      : Number.NaN;
+    const elapsed = Number.isFinite(startedAtTime)
+      ? Math.max(0, Math.floor((clock - startedAtTime) / 1000))
+      : Math.max(0, job?.elapsedSeconds ?? 0);
     return (
-      <div className="generation">
-        <div className="generation-orbit">
-          <Sparkles />
-          <i />
-          <i />
-        </div>
-        <span className="eyebrow">BUILDING YOUR TEXTBOOK</span>
-        <h1>
-          {job?.status === "failed"
-            ? "生成を完了できませんでした"
-            : "あなたのために、知識を編んでいます。"}
-        </h1>
-        <p>「{topic}」を読みやすい一冊にしています</p>
-        <div className="generation-steps">
-          {["researching", "outlining", "writing", "finalizing"].map((x, i) => {
-            const progress = job?.progress ?? 0;
-            const done = progress >= [20, 40, 80, 100][i];
-            return (
-              <div
-                className={
-                  done
-                    ? "done"
-                    : progress >= [0, 20, 40, 80][i]
-                      ? "current"
-                      : ""
-                }
-                key={x}
-              >
-                {done ? <Check /> : <span>{i + 1}</span>}
-                <strong>{labels[x]}</strong>
-              </div>
-            );
-          })}
-        </div>
-        {job?.status === "failed" && (
-          <button
-            className="button primary"
-            onClick={() => {
-              setJobId("");
-              void generate();
-            }}
-          >
-            もう一度試す
-          </button>
-        )}
+      <div className="generation" aria-live="polite">
+        <section className="generation-card">
+          <div className="generation-orbit">
+            <Sparkles />
+            <i />
+            <i />
+          </div>
+          <span className="eyebrow">BUILDING YOUR TEXTBOOK</span>
+          <h1>
+            {status === "failed"
+              ? "生成を完了できませんでした"
+              : status === "completed"
+                ? "教科書が完成しました"
+                : jobLoading
+                  ? "生成ジョブへ接続しています"
+                  : labels[status]}
+          </h1>
+          <p>「{job?.input.topic ?? topic}」</p>
+          <div className="generation-live-status">
+            <div className="generation-progress-heading">
+              <strong>{progress}%</strong>
+              <span>
+                <Clock3 size={15} /> {formatElapsed(elapsed)}経過
+              </span>
+            </div>
+            <div
+              className="generation-progress"
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={progress}
+            >
+              <span style={{ width: `${progress}%` }} />
+            </div>
+            <p>{job?.stageDetail ?? labels[status]}</p>
+            <small>進捗率は現在の工程をもとにした目安です</small>
+          </div>
+          <div className="generation-conditions">
+            <span>難易度：{job?.input.level ?? level}</span>
+            <span>目的：{job?.input.purpose ?? purpose}</span>
+          </div>
+          <div className="generation-steps">
+            {generationStages.map((stage, index) => {
+              const completed =
+                status === "completed" ||
+                (activeStage >= 0 && index < activeStage);
+              const current = index === activeStage;
+              return (
+                <div
+                  className={completed ? "done" : current ? "current" : ""}
+                  key={stage.status}
+                >
+                  {completed ? <Check /> : <span>{index + 1}</span>}
+                  <div>
+                    <strong>{stage.label}</strong>
+                    {current && job?.stageDetail && (
+                      <small>
+                        {status === "failed"
+                          ? `${stage.label}の途中で停止しました`
+                          : job.stageDetail}
+                      </small>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {status !== "completed" && status !== "failed" && (
+            <p className="generation-background-note">
+              この画面を閉じても生成は継続します。URLを再度開くと進捗を復元できます。
+            </p>
+          )}
+          {status === "failed" && (
+            <button
+              className="button primary"
+              onClick={() => {
+                setJobId("");
+                nav("/create", {
+                  replace: true,
+                  state: job?.input ?? regeneration,
+                });
+              }}
+            >
+              条件を確認してもう一度試す
+            </button>
+          )}
+        </section>
       </div>
     );
   }

@@ -6,6 +6,7 @@ import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { defineSecret, defineString } from "firebase-functions/params";
 import { textbookSchema } from "./schema.js";
+import { withoutInlineLinks } from "./sanitize.js";
 
 initializeApp();
 setGlobalOptions({ region: "asia-northeast1", maxInstances: 10 });
@@ -89,6 +90,7 @@ export const createTextbook = onCall(
         },
         status: "queued",
         progress: 0,
+        stageDetail: "生成ジョブを受け付けました",
         active: true,
         createdAt: now,
         updatedAt: now,
@@ -107,7 +109,7 @@ function outputText(response: any) {
     .join("");
 }
 async function generate(input: any) {
-  const prompt = `日本語の学習用教科書を作成してください。テーマ: ${input.topic}\n難易度: ${input.level}\n目的: ${input.purpose}\n正確性を優先し、web_searchで信頼できる情報源を調査してください。4章、各章3ページ。各ページに理解確認問題を1問、全体に暗記カードを8枚以上含めてください。blocksの未使用フィールドは空文字または空配列にしてください。`;
+  const prompt = `日本語の学習用教科書を作成してください。テーマ: ${input.topic}\n難易度: ${input.level}\n目的: ${input.purpose}\n正確性を優先し、web_searchで信頼できる情報源を調査してください。4章、各章3ページ。各ページに理解確認問題を1問、全体に暗記カードを8枚以上含めてください。本文blocksにはURL、Markdownリンク、出典の括弧書きを含めず、参照情報はsourcesだけに格納してください。blocksの未使用フィールドは空文字または空配列にしてください。`;
   const res = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
@@ -138,35 +140,85 @@ function block(raw: any) {
   const id = crypto.randomUUID();
   switch (raw.type) {
     case "heading":
-      return { id, type: "heading", level: 2, text: raw.text || raw.title };
+      return {
+        id,
+        type: "heading",
+        level: 2,
+        text: withoutInlineLinks(raw.text || raw.title),
+      };
     case "callout":
       return {
         id,
         type: "callout",
         tone: "key",
-        title: raw.title,
-        text: raw.text,
+        title: withoutInlineLinks(raw.title),
+        text: withoutInlineLinks(raw.text),
       };
     case "timeline":
-      return { id, type: "checklist", items: raw.items };
+      return {
+        id,
+        type: "checklist",
+        items: raw.items.map(withoutInlineLinks).filter(Boolean),
+      };
     case "table":
-      return { id, type: "table", headers: raw.headers, rows: raw.rows };
+      return {
+        id,
+        type: "table",
+        headers: raw.headers.map(withoutInlineLinks),
+        rows: raw.rows.map((row: unknown[]) => row.map(withoutInlineLinks)),
+      };
     case "checklist":
-      return { id, type: "checklist", items: raw.items };
+      return {
+        id,
+        type: "checklist",
+        items: raw.items.map(withoutInlineLinks).filter(Boolean),
+      };
     case "code":
       return { id, type: "code", language: "text", code: raw.text };
     case "question":
-      return { id, type: "question", prompt: raw.text };
+      return { id, type: "question", prompt: withoutInlineLinks(raw.text) };
     case "quote":
-      return { id, type: "quote", text: raw.text, source: raw.title };
+      return {
+        id,
+        type: "quote",
+        text: withoutInlineLinks(raw.text),
+        source: withoutInlineLinks(raw.title),
+      };
     case "formula":
       return { id, type: "formula", formula: raw.text };
     case "ai":
-      return { id, type: "ai", title: raw.title, text: raw.text };
+      return {
+        id,
+        type: "ai",
+        title: withoutInlineLinks(raw.title),
+        text: withoutInlineLinks(raw.text),
+      };
     default:
-      return { id, type: "paragraph", text: raw.text };
+      return { id, type: "paragraph", text: withoutInlineLinks(raw.text) };
   }
 }
+
+async function updateGenerationStage(
+  jobRef: FirebaseFirestore.DocumentReference,
+  bookRef: FirebaseFirestore.DocumentReference,
+  status: string,
+  progress: number,
+  stageDetail: string,
+) {
+  await Promise.all([
+    jobRef.update({
+      status,
+      progress,
+      stageDetail,
+      updatedAt: FieldValue.serverTimestamp(),
+    }),
+    bookRef.update({
+      generationStatus: status,
+      updatedAt: FieldValue.serverTimestamp(),
+    }),
+  ]);
+}
+
 export const processTextbook = onDocumentCreated(
   {
     document: "generationJobs/{jobId}",
@@ -181,28 +233,60 @@ export const processTextbook = onDocumentCreated(
     const job = snap.data();
     const jobRef = snap.ref;
     const bookRef = db.doc(`textbooks/${job.textbookId}`);
+    let researchHeartbeat: NodeJS.Timeout | undefined;
+    let heartbeatWrite: Promise<unknown> = Promise.resolve();
+    let currentStage = "queued";
     try {
-      await Promise.all([
-        jobRef.update({
-          status: "researching",
-          progress: 10,
-          updatedAt: FieldValue.serverTimestamp(),
-        }),
-        bookRef.update({
-          generationStatus: "researching",
-          updatedAt: FieldValue.serverTimestamp(),
-        }),
-      ]);
+      currentStage = "researching";
+      await updateGenerationStage(
+        jobRef,
+        bookRef,
+        "researching",
+        8,
+        "AIがWebを調査し、教科書の構成を考えています",
+      );
+      await jobRef.update({ startedAt: FieldValue.serverTimestamp() });
+      const researchStartedAt = Date.now();
+      researchHeartbeat = setInterval(() => {
+        const elapsedSeconds = Math.floor(
+          (Date.now() - researchStartedAt) / 1000,
+        );
+        const progress = Math.min(38, 8 + Math.floor(elapsedSeconds / 15) * 3);
+        heartbeatWrite = heartbeatWrite
+          .then(() =>
+            jobRef.update({
+              progress,
+              elapsedSeconds,
+              stageDetail: "AIが情報源を調査し、章立てと本文を生成しています",
+              updatedAt: FieldValue.serverTimestamp(),
+            }),
+          )
+          .catch((error) => console.warn("generation_heartbeat_failed", error));
+      }, 15000);
       const result = await generate(job.input);
-      await jobRef.update({
-        status: "writing",
-        progress: 55,
-        updatedAt: FieldValue.serverTimestamp(),
-      });
+      clearInterval(researchHeartbeat);
+      researchHeartbeat = undefined;
+      await heartbeatWrite;
+      currentStage = "outlining";
+      await updateGenerationStage(
+        jobRef,
+        bookRef,
+        "outlining",
+        42,
+        "生成結果の章立てと12ページの構成を確認しています",
+      );
       const chapterIds: string[] = [];
       let firstPageId: string | undefined;
       const batch = db.batch();
       for (const [ci, c] of result.chapters.entries()) {
+        currentStage = "writing";
+        await updateGenerationStage(
+          jobRef,
+          bookRef,
+          "writing",
+          52 + ci * 9,
+          `第${ci + 1}章のページと確認問題を保存しています`,
+        );
         const chapterRef = bookRef.collection("chapters").doc();
         chapterIds.push(chapterRef.id);
         const pageIds: string[] = [];
@@ -241,6 +325,14 @@ export const processTextbook = onDocumentCreated(
           updatedAt: FieldValue.serverTimestamp(),
         });
       }
+      currentStage = "finalizing";
+      await updateGenerationStage(
+        jobRef,
+        bookRef,
+        "finalizing",
+        90,
+        "暗記カードと参照元を仕上げています",
+      );
       for (const card of result.flashcards) {
         const ref = bookRef.collection("flashcards").doc();
         batch.set(ref, {
@@ -251,6 +343,11 @@ export const processTextbook = onDocumentCreated(
           updatedAt: FieldValue.serverTimestamp(),
         });
       }
+      await jobRef.update({
+        progress: 96,
+        stageDetail: "すべてのデータを確認して公開準備をしています",
+        updatedAt: FieldValue.serverTimestamp(),
+      });
       batch.update(bookRef, {
         title: result.title,
         subtitle: result.subtitle,
@@ -263,19 +360,23 @@ export const processTextbook = onDocumentCreated(
       batch.update(jobRef, {
         status: "completed",
         progress: 100,
+        stageDetail: "教科書が完成しました",
         active: false,
         firstPageId,
         updatedAt: FieldValue.serverTimestamp(),
       });
       await batch.commit();
     } catch (error) {
+      if (researchHeartbeat) clearInterval(researchHeartbeat);
+      await heartbeatWrite;
       console.error("generation_failed", error);
       await Promise.all([
         jobRef.update({
           status: "failed",
-          progress: 0,
           active: false,
           errorCode: "GENERATION_FAILED",
+          failedAtStage: currentStage,
+          stageDetail: "生成中に問題が発生しました",
           updatedAt: FieldValue.serverTimestamp(),
         }),
         bookRef.update({

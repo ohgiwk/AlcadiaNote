@@ -29,7 +29,11 @@ export interface GenerationJob extends BaseEntity {
   status: GenerationStatus;
   progress: number;
   input: TextbookGenerationInput;
+  stageDetail?: string;
+  startedAt?: string;
+  elapsedSeconds?: number;
   errorCode?: string;
+  failedAtStage?: GenerationStatus;
   firstPageId?: ID;
 }
 export type ContentBlock =

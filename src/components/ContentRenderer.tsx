@@ -1,19 +1,27 @@
 import { Bot, Check, Lightbulb, Play, Sparkles } from "lucide-react";
 import type { ContentBlock } from "../types/models";
+import { withoutInlineLinks } from "../utils/text";
 export function ContentRenderer({ block }: { block: ContentBlock }) {
   switch (block.type) {
     case "heading":
-      return block.level === 2 ? <h2>{block.text}</h2> : <h3>{block.text}</h3>;
-    case "paragraph":
-      return (
-        <p contentEditable suppressContentEditableWarning>
-          {block.text}
-        </p>
+      return block.level === 2 ? (
+        <h2>{withoutInlineLinks(block.text)}</h2>
+      ) : (
+        <h3>{withoutInlineLinks(block.text)}</h3>
       );
+    case "paragraph": {
+      const text = withoutInlineLinks(block.text);
+      return text ? (
+        <p contentEditable suppressContentEditableWarning>
+          {text}
+        </p>
+      ) : null;
+    }
     case "quote":
       return (
         <blockquote>
-          “{block.text}”{block.source && <cite>— {block.source}</cite>}
+          “{withoutInlineLinks(block.text)}”
+          {block.source && <cite>— {withoutInlineLinks(block.source)}</cite>}
         </blockquote>
       );
     case "callout":
@@ -21,8 +29,8 @@ export function ContentRenderer({ block }: { block: ContentBlock }) {
         <aside className={`callout ${block.tone}`}>
           <Lightbulb size={19} />
           <div>
-            <strong>{block.title}</strong>
-            <p>{block.text}</p>
+            <strong>{withoutInlineLinks(block.title)}</strong>
+            <p>{withoutInlineLinks(block.text)}</p>
           </div>
         </aside>
       );
@@ -34,8 +42,8 @@ export function ContentRenderer({ block }: { block: ContentBlock }) {
               <time>{x.year}</time>
               <span />
               <section>
-                <strong>{x.title}</strong>
-                <p>{x.text}</p>
+                <strong>{withoutInlineLinks(x.title)}</strong>
+                <p>{withoutInlineLinks(x.text)}</p>
               </section>
             </div>
           ))}
@@ -48,7 +56,7 @@ export function ContentRenderer({ block }: { block: ContentBlock }) {
             <thead>
               <tr>
                 {block.headers.map((x) => (
-                  <th key={x}>{x}</th>
+                  <th key={x}>{withoutInlineLinks(x)}</th>
                 ))}
               </tr>
             </thead>
@@ -56,7 +64,7 @@ export function ContentRenderer({ block }: { block: ContentBlock }) {
               {block.rows.map((row, i) => (
                 <tr key={i}>
                   {row.map((x, j) => (
-                    <td key={j}>{x}</td>
+                    <td key={j}>{withoutInlineLinks(x)}</td>
                   ))}
                 </tr>
               ))}
@@ -74,7 +82,7 @@ export function ContentRenderer({ block }: { block: ContentBlock }) {
             <b>→</b>
             <span>機械運動</span>
           </div>
-          <figcaption>{block.caption}</figcaption>
+          <figcaption>{withoutInlineLinks(block.caption)}</figcaption>
         </figure>
       );
     case "checklist":
@@ -83,7 +91,7 @@ export function ContentRenderer({ block }: { block: ContentBlock }) {
           {block.items.map((x) => (
             <li key={x}>
               <Check size={16} />
-              {x}
+              {withoutInlineLinks(x)}
             </li>
           ))}
         </ul>
@@ -93,8 +101,8 @@ export function ContentRenderer({ block }: { block: ContentBlock }) {
         <aside className="ai-block">
           <Sparkles size={18} />
           <div>
-            <strong>{block.title}</strong>
-            <p>{block.text}</p>
+            <strong>{withoutInlineLinks(block.title)}</strong>
+            <p>{withoutInlineLinks(block.text)}</p>
           </div>
         </aside>
       );
@@ -102,7 +110,7 @@ export function ContentRenderer({ block }: { block: ContentBlock }) {
       return (
         <aside className="question-block">
           <strong>考えてみよう</strong>
-          <p>{block.prompt}</p>
+          <p>{withoutInlineLinks(block.prompt)}</p>
         </aside>
       );
     case "formula":
@@ -116,14 +124,14 @@ export function ContentRenderer({ block }: { block: ContentBlock }) {
     case "video":
       return (
         <div className="video">
-          <Play /> {block.title}
+          <Play /> {withoutInlineLinks(block.title)}
         </div>
       );
     case "flashcard":
       return (
         <div className="inline-card">
-          <strong>{block.front}</strong>
-          <span>{block.back}</span>
+          <strong>{withoutInlineLinks(block.front)}</strong>
+          <span>{withoutInlineLinks(block.back)}</span>
         </div>
       );
     default:

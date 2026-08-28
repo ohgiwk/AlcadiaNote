@@ -18,6 +18,8 @@ const clean = <T>(id: string, data: DocumentData) =>
       data.createdAt?.toDate?.().toISOString?.() ?? data.createdAt ?? "",
     updatedAt:
       data.updatedAt?.toDate?.().toISOString?.() ?? data.updatedAt ?? "",
+    startedAt:
+      data.startedAt?.toDate?.().toISOString?.() ?? data.startedAt ?? "",
   }) as T;
 export function useCollection<T>(
   path: string,
