@@ -1,0 +1,15 @@
+node_modules/
+functions/node_modules/
+dist/
+functions/lib/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+functions/.env
+firebase-debug.log
+.firebase/
+alcadia/
+.agents/
+.claude/
+skills-lock.json

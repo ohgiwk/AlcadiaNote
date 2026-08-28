@@ -1,0 +1,149 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function ownsResource() {
+      return signedIn() && resource.data.ownerId == request.auth.uid;
+    }
+
+    function validBase(data, uid) {
+      return data.ownerId == uid
+        && data.ownerId is string
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function validUpdatedCreatedAt(data) {
+      return data.createdAt == resource.data.createdAt
+        || data.createdAt == request.time;
+    }
+
+    function validBookmark(data, uid) {
+      return validBase(data, uid)
+        && data.keys().hasOnly(['ownerId', 'textbookId', 'pageId', 'createdAt', 'updatedAt'])
+        && data.textbookId is string && data.textbookId.size() <= 128
+        && data.pageId is string && data.pageId.size() <= 128;
+    }
+
+    function validNote(data, uid) {
+      return validBase(data, uid)
+        && data.keys().hasOnly(['ownerId', 'textbookId', 'pageId', 'text', 'quote', 'createdAt', 'updatedAt'])
+        && data.textbookId is string && data.textbookId.size() <= 128
+        && data.pageId is string && data.pageId.size() <= 128
+        && data.text is string && data.text.size() > 0 && data.text.size() <= 5000
+        && data.quote is string && data.quote.size() <= 2000;
+    }
+
+    function validProgress(data, uid) {
+      return validBase(data, uid)
+        && data.keys().hasOnly(['ownerId', 'textbookId', 'pageId', 'percent', 'createdAt', 'updatedAt'])
+        && data.textbookId is string && data.textbookId.size() <= 128
+        && data.pageId is string && data.pageId.size() <= 128
+        && data.percent is number && data.percent >= 0 && data.percent <= 100;
+    }
+
+    function validQuizAttempt(data, uid) {
+      return validBase(data, uid)
+        && data.keys().hasOnly(['ownerId', 'textbookId', 'quizId', 'response', 'correct', 'createdAt', 'updatedAt'])
+        && data.textbookId is string && data.textbookId.size() <= 128
+        && data.quizId is string && data.quizId.size() <= 128
+        && data.response is string && data.response.size() <= 2000
+        && data.correct is bool;
+    }
+
+    function validFlashcardProgress(data, uid) {
+      return validBase(data, uid)
+        && data.keys().hasOnly(['ownerId', 'textbookId', 'cardId', 'mastery', 'createdAt', 'updatedAt'])
+        && data.textbookId is string && data.textbookId.size() <= 128
+        && data.cardId is string && data.cardId.size() <= 128
+        && data.mastery is number && data.mastery >= 0 && data.mastery <= 5;
+    }
+
+    // Generated textbook data. Clients may read their own books; only Admin SDK functions write them.
+    match /textbooks/{textbookId} {
+      allow read: if ownsResource();
+      allow write: if false;
+
+      match /{generatedDocument=**} {
+        allow read: if signedIn()
+          && get(/databases/$(database)/documents/textbooks/$(textbookId)).data.ownerId == request.auth.uid;
+        allow write: if false;
+      }
+    }
+
+    // Asynchronous generation jobs. Clients only observe their own job status.
+    match /generationJobs/{jobId} {
+      allow read: if ownsResource();
+      allow write: if false;
+    }
+
+    // User-owned learning state. Every allowed write validates ownership, keys, types, and bounds.
+    match /users/{uid} {
+      allow read, write: if false;
+
+      match /bookmarks/{bookmarkId} {
+        allow read, delete: if isOwner(uid) && ownsResource();
+        allow create: if isOwner(uid) && validBookmark(request.resource.data, uid);
+        allow update: if isOwner(uid)
+          && ownsResource()
+          && validBookmark(request.resource.data, uid)
+          && validUpdatedCreatedAt(request.resource.data);
+      }
+
+      match /notes/{noteId} {
+        allow read, delete: if isOwner(uid) && ownsResource();
+        allow create: if isOwner(uid) && validNote(request.resource.data, uid);
+        allow update: if isOwner(uid)
+          && ownsResource()
+          && validNote(request.resource.data, uid)
+          && validUpdatedCreatedAt(request.resource.data);
+      }
+
+      match /progress/{textbookId} {
+        allow read, delete: if isOwner(uid) && ownsResource();
+        allow create: if isOwner(uid) && validProgress(request.resource.data, uid);
+        allow update: if isOwner(uid)
+          && ownsResource()
+          && validProgress(request.resource.data, uid)
+          && validUpdatedCreatedAt(request.resource.data);
+      }
+
+      match /quizAttempts/{attemptId} {
+        allow read, delete: if isOwner(uid) && ownsResource();
+        allow create: if isOwner(uid) && validQuizAttempt(request.resource.data, uid);
+        allow update: if isOwner(uid)
+          && ownsResource()
+          && validQuizAttempt(request.resource.data, uid)
+          && validUpdatedCreatedAt(request.resource.data);
+      }
+
+      match /flashcardProgress/{cardId} {
+        allow read, delete: if isOwner(uid) && ownsResource();
+        allow create: if isOwner(uid) && validFlashcardProgress(request.resource.data, uid);
+        allow update: if isOwner(uid)
+          && ownsResource()
+          && validFlashcardProgress(request.resource.data, uid)
+          && validUpdatedCreatedAt(request.resource.data);
+      }
+
+      // AI conversations are written by Cloud Functions after ownership checks.
+      match /conversations/{conversationId} {
+        allow read: if isOwner(uid) && ownsResource();
+        allow write: if false;
+      }
+    }
+
+    // Default deny for all current and future collections.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

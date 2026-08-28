@@ -1,0 +1,143 @@
+import {
+  collection,
+  deleteDoc,
+  doc,
+  getDocs,
+  query,
+  serverTimestamp,
+  setDoc,
+  where,
+} from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
+import { db, functions } from "../firebase";
+import type {
+  AIConversationRequest,
+  TextbookGenerationInput,
+} from "../types/models";
+export async function createTextbook(input: TextbookGenerationInput) {
+  return (
+    await httpsCallable<
+      TextbookGenerationInput,
+      { jobId: string; textbookId: string }
+    >(
+      functions,
+      "createTextbook",
+    )(input)
+  ).data;
+}
+export async function askPageQuestion(input: AIConversationRequest) {
+  return (
+    await httpsCallable<AIConversationRequest, { answer: string }>(
+      functions,
+      "askPageQuestion",
+    )(input)
+  ).data.answer;
+}
+export async function deleteTextbook(textbookId: string) {
+  return (
+    await httpsCallable<{ textbookId: string }, { deleted: boolean }>(
+      functions,
+      "deleteTextbook",
+    )({ textbookId })
+  ).data;
+}
+export async function toggleBookmark(
+  uid: string,
+  textbookId: string,
+  pageId: string,
+) {
+  const found = await getDocs(
+    query(
+      collection(db, `users/${uid}/bookmarks`),
+      where("textbookId", "==", textbookId),
+      where("pageId", "==", pageId),
+    ),
+  );
+  if (!found.empty) {
+    await Promise.all(found.docs.map((x) => deleteDoc(x.ref)));
+    return false;
+  }
+  const ref = doc(collection(db, `users/${uid}/bookmarks`));
+  await setDoc(ref, {
+    ownerId: uid,
+    textbookId,
+    pageId,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  return true;
+}
+export async function addNote(
+  uid: string,
+  textbookId: string,
+  pageId: string,
+  text: string,
+  quote = "",
+) {
+  const ref = doc(collection(db, `users/${uid}/notes`));
+  await setDoc(ref, {
+    ownerId: uid,
+    textbookId,
+    pageId,
+    text,
+    quote,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+}
+export async function saveProgress(
+  uid: string,
+  textbookId: string,
+  pageId: string,
+  percent: number,
+) {
+  await setDoc(
+    doc(db, `users/${uid}/progress/${textbookId}`),
+    {
+      ownerId: uid,
+      textbookId,
+      pageId,
+      percent,
+      updatedAt: serverTimestamp(),
+      createdAt: serverTimestamp(),
+    },
+    { merge: true },
+  );
+}
+export async function saveQuizAttempt(
+  uid: string,
+  textbookId: string,
+  quizId: string,
+  response: string,
+  correct: boolean,
+) {
+  const ref = doc(collection(db, `users/${uid}/quizAttempts`));
+  await setDoc(ref, {
+    ownerId: uid,
+    textbookId,
+    quizId,
+    response,
+    correct,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+}
+export async function rateFlashcard(
+  uid: string,
+  textbookId: string,
+  cardId: string,
+  mastery: number,
+) {
+  await setDoc(
+    doc(db, `users/${uid}/flashcardProgress/${cardId}`),
+    {
+      ownerId: uid,
+      textbookId,
+      cardId,
+      mastery,
+      updatedAt: serverTimestamp(),
+      createdAt: serverTimestamp(),
+    },
+    { merge: true },
+  );
+}
