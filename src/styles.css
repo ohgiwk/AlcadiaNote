@@ -762,6 +762,9 @@ a {
 }
 .reader {
   height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
   display: grid;
   grid-template-columns: 250px minmax(430px, 1fr) 310px;
   background: #f6f5f2;
@@ -769,9 +772,14 @@ a {
 .reader-toc,
 .reader-ai {
   min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
 }
 .chapter-sidebar {
   height: 100%;
+  min-height: 0;
+  overflow: hidden;
   background: #fafafa;
   border-right: 1px solid var(--line);
   display: flex;
@@ -791,8 +799,11 @@ a {
   margin-top: 4px;
 }
 .chapter-sidebar nav {
+  flex: 1 1 auto;
+  min-height: 0;
   padding: 3px 10px;
-  overflow: auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .chapter-sidebar section h3 {
   font-size: 12px;
@@ -858,7 +869,8 @@ a {
   display: grid;
   grid-template-rows: 58px 1fr 56px;
   min-width: 0;
-  height: 100vh;
+  height: 100%;
+  min-height: 0;
 }
 .reader-toolbar {
   background: rgba(255, 255, 255, 0.92);
@@ -880,6 +892,7 @@ a {
   color: var(--muted);
 }
 .reader-scroll {
+  min-height: 0;
   overflow: auto;
   padding: 32px 4vw;
 }
@@ -1109,6 +1122,8 @@ a {
 }
 .ai-panel {
   height: 100%;
+  min-height: 0;
+  overflow: hidden;
   background: #fff;
   border-left: 1px solid var(--line);
   display: grid;
@@ -1133,7 +1148,9 @@ a {
   margin-left: 24px;
 }
 .chat-scroll {
-  overflow: auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 18px 14px;
 }
 .message {
@@ -1918,9 +1935,25 @@ a {
   background: white;
   width: min(420px, 100%);
   height: 85vh;
+  height: 85dvh;
   margin-top: auto;
   border-radius: 20px 20px 0 0;
   overflow: auto;
+}
+.sheet:not(.dialog-sheet) {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.sheet:not(.dialog-sheet) > header {
+  flex: 0 0 55px;
+}
+.sheet:not(.dialog-sheet) > .chapter-sidebar,
+.sheet:not(.dialog-sheet) > .ai-panel {
+  flex: 1 1 auto;
+  width: 100%;
+  height: auto;
+  min-height: 0;
 }
 .sheet > header {
   height: 55px;
@@ -2189,11 +2222,9 @@ a {
     padding: 0 10px;
   }
   .chapter-sidebar {
-    height: auto;
     border: 0;
   }
   .ai-panel {
-    height: calc(85vh - 55px);
     border: 0;
   }
   .quiz-page main {
