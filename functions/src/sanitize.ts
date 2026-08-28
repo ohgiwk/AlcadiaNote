@@ -8,3 +8,12 @@ export function withoutInlineLinks(value: unknown) {
     .replace(/[ \t]+([。、，．])/g, "$1")
     .trim();
 }
+
+export function containsGenerationMeta(value: unknown) {
+  const text = String(value ?? "");
+  return (
+    /本文[・、]問題[・、]暗記カードは未作成/.test(text) ||
+    /ロードマップと目次[（(].*未作成/.test(text) ||
+    /参考情報は信頼できる.*(?:史料|情報源).*基づいて/.test(text)
+  );
+}

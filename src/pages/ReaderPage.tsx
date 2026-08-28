@@ -23,6 +23,7 @@ import { useCollection } from "../hooks/useFirestoreData";
 import { useTextbook } from "../hooks/useTextbook";
 import { saveProgress, toggleBookmark } from "../services/firebaseService";
 import type { Bookmark as BookmarkModel } from "../types/models";
+import { containsGenerationMeta, withoutInlineLinks } from "../utils/text";
 export function ReaderPage() {
   const { id = "", pageId = "" } = useParams();
   const { user } = useAuth();
@@ -112,7 +113,9 @@ export function ReaderPage() {
             <header>
               <span className="chapter-label">{book.category}</span>
               <h1>{page.title}</h1>
-              <p className="lead">{book.subtitle}</p>
+              {!containsGenerationMeta(book.subtitle) && (
+                <p className="lead">{withoutInlineLinks(book.subtitle)}</p>
+              )}
               <div className="read-meta">
                 <span>{page.readMinutes}分で読めます</span>
                 <span>AI生成教科書</span>

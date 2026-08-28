@@ -9,7 +9,7 @@ import {
 } from "firebase-functions/v2/firestore";
 import { defineSecret, defineString } from "firebase-functions/params";
 import { textbookOutlineSchema, textbookSchema } from "./schema.js";
-import { withoutInlineLinks } from "./sanitize.js";
+import { containsGenerationMeta, withoutInlineLinks } from "./sanitize.js";
 
 initializeApp();
 setGlobalOptions({ region: "asia-northeast1", maxInstances: 10 });
@@ -151,7 +151,9 @@ async function generateOutline(input: any) {
   );
   return {
     title: withoutInlineLinks(outline.title),
-    subtitle: withoutInlineLinks(outline.subtitle),
+    subtitle: containsGenerationMeta(outline.subtitle)
+      ? `${input.topic}を体系的に学ぶ教科書`
+      : withoutInlineLinks(outline.subtitle),
     category: withoutInlineLinks(outline.category),
     chapters: outline.chapters.map((chapter: any) => ({
       title: withoutInlineLinks(chapter.title),
@@ -165,7 +167,7 @@ async function generateOutline(input: any) {
 }
 async function generateTextbook(input: any, outline: any) {
   return structuredGeneration(
-    `承認済みのロードマップに厳密に従って、日本語の学習用教科書本文を作成してください。テーマ: ${input.topic}\n難易度: ${input.level}\n目的: ${input.purpose}\n承認済みロードマップ: ${JSON.stringify(outline)}\nタイトル、章名、ページ名と順序は変更しないでください。web_searchで信頼できる情報源を確認し、各ページに理解確認問題を1問、全体に暗記カードを8枚以上含めてください。本文blocksにはURL、Markdownリンク、出典の括弧書きを含めず、参照情報はsourcesだけに格納してください。blocksの未使用フィールドは空文字または空配列にしてください。`,
+    `あなたは高品質な教科書を執筆する専門家です。承認済みのロードマップに厳密に従って、日本語の学習用教科書本文を作成してください。\nテーマ: ${input.topic}\n難易度: ${input.level}\n目的: ${input.purpose}\n承認済みロードマップ: ${JSON.stringify(outline)}\n\n【各ページの執筆基準】\n- 単なる概要説明ではなく、そのページだけでもテーマを十分理解できる密度で執筆する\n- 本文は800〜1,200文字を目安とし、重要なテーマでは最大1,500文字程度まで許容する\n- 文字数を満たすための冗長な説明は禁止する\n- 必要に応じて見出しを2〜4個使用する\n- 定義だけで終わらず「なぜそうなるのか」まで説明する\n- 抽象的な概念には具体例を入れる\n- 前提知識が必要なら簡潔に補足する\n- 重要語句は明確に定義する\n- 必要に応じて比較、因果関係、背景を説明する\n- 図が理解を助ける場合は、calloutブロックで挿入位置と図表の内容を具体的に指定する\n\n【文章レベル】\n一般的な学校教科書〜入門専門書程度とし、簡潔さよりも体系的に理解できることを優先する。\n\n【禁止】\n- 箇条書きだけでページを構成する\n- 数行の説明だけで次のテーマへ進む\n- 「〜について説明します」のような不要な前置き\n- 同じ内容の言い換えによる水増し\n- ロードマップ、目次、生成状況、未作成の要素、情報源の信頼性など、制作工程を説明するメタ文言\n\nタイトル、章名、ページ名と順序は変更しないでください。web_searchで信頼できる情報源を確認し、各ページに理解確認問題を1問、全体に暗記カードを8枚以上含めてください。本文blocksにはURL、Markdownリンク、出典の括弧書きを含めず、参照情報はsourcesだけに格納してください。blocksの未使用フィールドは空文字または空配列にしてください。`,
     "textbook",
     textbookSchema,
   );
@@ -456,7 +458,14 @@ export const processTextbookContent = onDocumentUpdated(
             title: approvedChapter.pages[pi].title,
             order: ci * 3 + pi + 1,
             readMinutes: p.readMinutes,
-            blocks: p.blocks.map(block),
+            blocks: p.blocks
+              .filter(
+                (raw: any) =>
+                  !containsGenerationMeta(
+                    `${raw.title ?? ""} ${raw.text ?? ""}`,
+                  ),
+              )
+              .map(block),
             sources: p.sources.map((s: any) => ({
               ...s,
               accessedAt: new Date().toISOString(),

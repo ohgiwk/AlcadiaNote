@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { withoutInlineLinks } from "./sanitize.js";
+import { containsGenerationMeta, withoutInlineLinks } from "./sanitize.js";
 
 test("removes a parenthesized markdown source citation", () => {
   assert.equal(
@@ -34,4 +34,14 @@ test("removes a web-search citation from an outline summary", () => {
     ),
     "技術の変化を整理する。",
   );
+});
+
+test("detects generation-process text that must not appear in pages", () => {
+  assert.equal(
+    containsGenerationMeta(
+      "中級向けロードマップと目次（本文・問題・暗記カードは未作成）",
+    ),
+    true,
+  );
+  assert.equal(containsGenerationMeta("産業革命が社会を変えた背景"), false);
 });
