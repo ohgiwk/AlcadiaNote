@@ -28,6 +28,7 @@ import { useMediaQuery } from "../hooks/useMediaQuery";
 import { useTextbook } from "../hooks/useTextbook";
 import {
   addHighlight,
+  deleteHighlight,
   requestNextChapterGeneration,
   toggleBookmark,
 } from "../services/firebaseService";
@@ -110,6 +111,9 @@ export function ReaderPage() {
     (highlight) =>
       highlight.textbookId === id && highlight.pageId === pageId,
   );
+  const selectedHighlight = selection
+    ? pageHighlights.find((highlight) => highlight.text === selection.text)
+    : undefined;
   const clearNoteQuote = useCallback(() => setNoteQuote(null), []);
   useEffect(() => {
     if (!moreOpen) return;
@@ -174,18 +178,26 @@ export function ReaderPage() {
       y: Math.max(12, rect.top - 52),
     });
   }
-  async function saveHighlight() {
+  async function toggleHighlight() {
     if (!user || !selection || selection.pageId !== pageId || savingHighlight)
       return;
     setSavingHighlight(true);
     setHighlightError("");
     try {
-      await addHighlight(user.uid, id, pageId, selection.text);
+      if (selectedHighlight) {
+        await deleteHighlight(user.uid, selectedHighlight.id);
+      } else {
+        await addHighlight(user.uid, id, pageId, selection.text);
+      }
       window.getSelection()?.removeAllRanges();
       setSelection(null);
     } catch (error) {
       setHighlightError(
-        error instanceof Error ? error.message : "マーカーを保存できませんでした",
+        error instanceof Error
+          ? error.message
+          : selectedHighlight
+            ? "マーカーを削除できませんでした"
+            : "マーカーを保存できませんでした",
       );
     } finally {
       setSavingHighlight(false);
@@ -367,9 +379,15 @@ export function ReaderPage() {
               onMouseDown={(event) => event.preventDefault()}
             >
               <button
-                aria-label="選択箇所をマーカーとして保存"
+                aria-label={
+                  selectedHighlight
+                    ? "選択箇所のマーカーを削除"
+                    : "選択箇所をマーカーとして保存"
+                }
+                title={selectedHighlight ? "マーカーを削除" : "マーカーを追加"}
+                className={selectedHighlight ? "remove-highlight" : undefined}
                 disabled={savingHighlight}
-                onClick={() => void saveHighlight()}
+                onClick={() => void toggleHighlight()}
               >
                 <Highlighter size={18} />
               </button>

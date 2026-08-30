@@ -580,6 +580,10 @@
 .selection-tools button:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.14);
 }
+.selection-tools button.remove-highlight {
+  background: #fff1bd;
+  color: #5f4a00;
+}
 .selection-tools button:disabled {
   opacity: 0.5;
 }

@@ -135,6 +135,9 @@ export async function addHighlight(
     updatedAt: serverTimestamp(),
   });
 }
+export async function deleteHighlight(uid: string, highlightId: string) {
+  await deleteDoc(doc(db, `users/${uid}/highlights/${highlightId}`));
+}
 export async function saveProgress(
   uid: string,
   textbookId: string,
