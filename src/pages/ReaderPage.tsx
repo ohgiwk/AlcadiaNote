@@ -14,7 +14,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { where } from "firebase/firestore";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../auth";
 import { ContentRenderer } from "../components/ContentRenderer";
@@ -55,14 +55,34 @@ export function ReaderPage() {
   const idx = pages.indexOf(page!);
   const [toc, setToc] = useState(false);
   const [ai, setAi] = useState(false);
+  const [chatOpen, setChatOpen] = useState(true);
+  const [compactReader, setCompactReader] = useState(
+    () => window.matchMedia("(max-width: 800px)").matches,
+  );
   const [searchOpen, setSearchOpen] = useState(false);
   const [bookmarking, setBookmarking] = useState(false);
   const [bookmarkError, setBookmarkError] = useState("");
   const [chapterError, setChapterError] = useState("");
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreRef = useRef<HTMLDivElement>(null);
   const bookmarkedPageIds = new Set(
     bookmarks.filter((x) => x.textbookId === id).map((x) => x.pageId),
   );
   const marked = bookmarkedPageIds.has(pageId);
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 800px)");
+    const update = () => setCompactReader(media.matches);
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+  useEffect(() => {
+    if (!moreOpen) return;
+    const close = (event: MouseEvent) => {
+      if (!moreRef.current?.contains(event.target as Node)) setMoreOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [moreOpen]);
   useEffect(() => {
     document.querySelector(".reader-scroll")?.scrollTo(0, 0);
     if (user && page && pages.length)
@@ -112,7 +132,7 @@ export function ReaderPage() {
   );
   const chat = <AIChatPanel textbookId={id} pageId={page.id} />;
   return (
-    <div className="reader">
+    <div className={`reader ${chatOpen ? "" : "chat-closed"}`}>
       <div className="reader-toc desktop">{sidebar}</div>
       <section className="reader-center">
         <header className="reader-toolbar">
@@ -151,28 +171,52 @@ export function ReaderPage() {
             >
               <GalleryVerticalEnd size={19} />
             </Link>
-            <IconButton label="AIチャット" onClick={() => setAi(true)}>
+            <IconButton
+              label={
+                compactReader
+                  ? "AIチャットを開く"
+                  : chatOpen
+                    ? "AIチャットを閉じる"
+                    : "AIチャットを開く"
+              }
+              aria-pressed={!compactReader && chatOpen}
+              onClick={() =>
+                compactReader ? setAi(true) : setChatOpen((open) => !open)
+              }
+            >
               <Sparkles size={19} />
             </IconButton>
-            <Link
-              className="icon-button reader-regenerate-link"
-              aria-label="条件を変えて再生成"
-              to="/create"
-              state={{
-                topic: book.topic ?? book.title,
-                level: book.level ?? "AIに任せる",
-                purpose: book.purpose ?? "教養",
-                sourceTextbookId: book.id,
-              }}
-            >
-              <RefreshCw size={19} />
-            </Link>
             <IconButton label="表示設定">
               <Settings2 size={19} />
             </IconButton>
-            <IconButton label="その他">
-              <MoreHorizontal size={19} />
-            </IconButton>
+            <div className="reader-more" ref={moreRef}>
+              <IconButton
+                label="その他"
+                aria-haspopup="menu"
+                aria-expanded={moreOpen}
+                onClick={() => setMoreOpen((open) => !open)}
+              >
+                <MoreHorizontal size={19} />
+              </IconButton>
+              {moreOpen && (
+                <div className="reader-more-menu" role="menu">
+                  <Link
+                    role="menuitem"
+                    to="/create"
+                    state={{
+                      topic: book.topic ?? book.title,
+                      level: book.level ?? "AIに任せる",
+                      purpose: book.purpose ?? "教養",
+                      sourceTextbookId: book.id,
+                    }}
+                    onClick={() => setMoreOpen(false)}
+                  >
+                    <RefreshCw size={16} />
+                    条件を変えて再生成
+                  </Link>
+                </div>
+              )}
+            </div>
           </div>
         </header>
         {bookmarkError && (
@@ -246,11 +290,15 @@ export function ReaderPage() {
           </button>
         </footer>
       </section>
-      <div className="reader-ai desktop">{chat}</div>
+      {chatOpen && <div className="reader-ai desktop">{chat}</div>}
       <Sheet open={toc} onClose={() => setToc(false)} title="目次">
         {sidebar}
       </Sheet>
-      <Sheet open={ai} onClose={() => setAi(false)} title="Arcadia AI">
+      <Sheet
+        open={compactReader && ai}
+        onClose={() => setAi(false)}
+        title="Arcadia AI"
+      >
         {chat}
       </Sheet>
       <Sheet
