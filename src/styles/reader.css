@@ -11,6 +11,12 @@
 .reader.chat-closed {
   grid-template-columns: 250px minmax(430px, 1fr);
 }
+.reader.toc-closed {
+  grid-template-columns: minmax(430px, 1fr) 310px;
+}
+.reader.toc-closed.chat-closed {
+  grid-template-columns: minmax(430px, 1fr);
+}
 .reader-toc,
 .reader-ai {
   min-width: 0;
@@ -297,7 +303,7 @@
   justify-content: space-between;
 }
 .reader-toolbar > .icon-button:first-child {
-  display: none;
+  display: grid;
 }
 .reader-more {
   position: relative;

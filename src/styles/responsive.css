@@ -2,8 +2,12 @@
   .reader {
     grid-template-columns: minmax(430px, 1fr) 300px;
   }
-  .reader.chat-closed {
+  .reader.chat-closed,
+  .reader.toc-closed.chat-closed {
     grid-template-columns: minmax(430px, 1fr);
+  }
+  .reader.toc-closed {
+    grid-template-columns: minmax(430px, 1fr) 300px;
   }
   .reader-toc.desktop {
     display: none;
@@ -91,6 +95,11 @@
     margin-bottom: 18px;
   }
   .reader {
+    grid-template-columns: 1fr;
+  }
+  .reader.toc-closed,
+  .reader.chat-closed,
+  .reader.toc-closed.chat-closed {
     grid-template-columns: 1fr;
   }
   .reader-ai.desktop {

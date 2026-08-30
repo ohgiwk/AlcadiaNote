@@ -65,9 +65,11 @@ export function ReaderPage() {
   const isChapterEnd = currentChapter?.pageIds.at(-1) === pageId;
   const idx = pages.indexOf(page!);
   const [toc, setToc] = useState(false);
+  const [tocCollapsed, setTocCollapsed] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<"ai" | "notes" | null>(null);
   const [sidePanel, setSidePanel] = useState<"ai" | "notes" | null>("ai");
   const compactReader = useMediaQuery("(max-width: 800px)");
+  const compactToc = useMediaQuery("(max-width: 1100px)");
   const [searchOpen, setSearchOpen] = useState(false);
   const [bookmarking, setBookmarking] = useState(false);
   const [bookmarkError, setBookmarkError] = useState("");
@@ -157,6 +159,13 @@ export function ReaderPage() {
     }
     setSidePanel((current) => (current === panel ? null : panel));
   }
+  function toggleToc() {
+    if (compactToc) {
+      setToc(true);
+      return;
+    }
+    setTocCollapsed((collapsed) => !collapsed);
+  }
   function captureSelection() {
     const selected = window.getSelection();
     const text = selected?.toString().trim() ?? "";
@@ -241,11 +250,23 @@ export function ReaderPage() {
     />
   );
   return (
-    <div className={`reader ${sidePanel ? "" : "chat-closed"}`}>
-      <div className="reader-toc desktop">{sidebar}</div>
+    <div
+      className={`reader ${sidePanel ? "" : "chat-closed"} ${tocCollapsed ? "toc-closed" : ""}`}
+    >
+      {!tocCollapsed && <div className="reader-toc desktop">{sidebar}</div>}
       <section className="reader-center">
         <header className="reader-toolbar">
-          <IconButton label="目次" onClick={() => setToc(true)}>
+          <IconButton
+            label={
+              compactToc
+                ? "目次を開く"
+                : tocCollapsed
+                  ? "目次を表示"
+                  : "目次を折りたたむ"
+            }
+            aria-pressed={!compactToc && !tocCollapsed}
+            onClick={toggleToc}
+          >
             <List size={20} />
           </IconButton>
           <div className="crumb">
