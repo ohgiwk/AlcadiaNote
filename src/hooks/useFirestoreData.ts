@@ -38,7 +38,12 @@ export function useCollection<T>(
 ) {
   const enabled = options.enabled ?? true;
   const filtersKey = JSON.stringify(options.filters ?? []);
-  const orderKey = JSON.stringify(options.order ?? ["createdAt", "desc"]);
+  const defaultOrder: CollectionOrder | null = options.filters
+    ? null
+    : ["createdAt", "desc"];
+  const orderKey = JSON.stringify(
+    options.order === undefined ? defaultOrder : options.order,
+  );
   const requestKey = `${path}:${filtersKey}:${orderKey}`;
   const [state, setState] = useState<{
     key: string;

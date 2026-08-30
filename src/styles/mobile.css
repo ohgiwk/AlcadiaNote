@@ -211,10 +211,14 @@
 }
 
 @media (max-width: 480px) {
-  .book-grid,
-  .library-grid {
+  .book-grid {
     grid-template-columns: 1fr;
     gap: 28px;
+  }
+
+  .library-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px 12px;
   }
 
   .book-cover p {
