@@ -1,4 +1,3 @@
-import { where } from "firebase/firestore";
 import { Search, SlidersHorizontal } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -31,13 +30,16 @@ export function LibraryPage() {
     data: textbooks,
     loading,
     error,
-  } = useCollection<Textbook>(
-    "textbooks",
-    user ? [where("ownerId", "==", user.uid)] : [],
-  );
+  } = useCollection<Textbook>("textbooks", {
+    enabled: Boolean(user),
+    filters: user ? [["ownerId", "==", user.uid]] : [],
+  });
   const { data: progressEntries } = useCollection<UserProgress>(
-    user ? `users/${user.uid}/progress` : "__none__",
-    user ? [where("ownerId", "==", user.uid)] : [],
+    `users/${user?.uid}/progress`,
+    {
+      enabled: Boolean(user),
+      filters: user ? [["ownerId", "==", user.uid]] : [],
+    },
   );
   const progressByTextbook = useMemo(
     () =>

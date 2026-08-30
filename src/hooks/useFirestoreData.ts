@@ -4,8 +4,10 @@ import {
   onSnapshot,
   orderBy,
   query,
+  where,
   type DocumentData,
-  type QueryConstraint,
+  type OrderByDirection,
+  type WhereFilterOp,
 } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import { db, firebaseConfigured } from "../firebase";
@@ -21,40 +23,88 @@ const clean = <T>(id: string, data: DocumentData) =>
     startedAt:
       data.startedAt?.toDate?.().toISOString?.() ?? data.startedAt ?? "",
   }) as T;
+type CollectionFilter = readonly [string, WhereFilterOp, unknown];
+type CollectionOrder = readonly [string, OrderByDirection];
+
+interface CollectionOptions {
+  enabled?: boolean;
+  filters?: readonly CollectionFilter[];
+  order?: CollectionOrder | null;
+}
+
 export function useCollection<T>(
   path: string,
-  constraints: QueryConstraint[] = [orderBy("createdAt", "desc")],
+  options: CollectionOptions = {},
 ) {
-  const [data, setData] = useState<T[]>([]);
-  const [loading, setLoading] = useState(firebaseConfigured);
-  const [error, setError] = useState("");
+  const enabled = options.enabled ?? true;
+  const filtersKey = JSON.stringify(options.filters ?? []);
+  const orderKey = JSON.stringify(options.order ?? ["createdAt", "desc"]);
+  const requestKey = `${path}:${filtersKey}:${orderKey}`;
+  const [state, setState] = useState<{
+    key: string;
+    data: T[];
+    error: string;
+  }>({ key: "", data: [], error: "" });
   useEffect(() => {
-    if (!firebaseConfigured) return;
+    if (!enabled || !firebaseConfigured) return;
+    const filters = (JSON.parse(filtersKey) as CollectionFilter[]).map(
+      ([field, operator, value]) => where(field, operator, value),
+    );
+    const parsedOrder = JSON.parse(orderKey) as CollectionOrder | null;
+    const constraints = parsedOrder
+      ? [...filters, orderBy(parsedOrder[0], parsedOrder[1])]
+      : filters;
     return onSnapshot(
       query(collection(db, path), ...constraints),
       (s) => {
-        setData(s.docs.map((d) => clean<T>(d.id, d.data())));
-        setLoading(false);
+        setState({
+          key: requestKey,
+          data: s.docs.map((d) => clean<T>(d.id, d.data())),
+          error: "",
+        });
       },
       (e) => {
-        setError(e.message);
-        setLoading(false);
+        setState({ key: requestKey, data: [], error: e.message });
       },
     );
-    // Query constraints are intentionally recreated by callers; path/auth changes remount the subscription.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [path]);
-  return { data, loading, error };
+  }, [enabled, filtersKey, orderKey, path, requestKey]);
+  const active = enabled && firebaseConfigured;
+  const current = active && state.key === requestKey;
+  return {
+    data: current ? state.data : [],
+    loading: active && !current,
+    error: current ? state.error : "",
+  };
 }
 export function useDocument<T>(path?: string) {
-  const [data, setData] = useState<T | null>(null);
-  const [loading, setLoading] = useState(Boolean(path && firebaseConfigured));
+  const [state, setState] = useState<{
+    key: string;
+    data: T | null;
+    error: string;
+  }>({ key: "", data: null, error: "" });
   useEffect(() => {
     if (!path || !firebaseConfigured) return;
-    return onSnapshot(doc(db, path), (s) => {
-      setData(s.exists() ? clean<T>(s.id, s.data()) : null);
-      setLoading(false);
-    });
+    return onSnapshot(
+      doc(db, path),
+      (snapshot) => {
+        setState({
+          key: path,
+          data: snapshot.exists()
+            ? clean<T>(snapshot.id, snapshot.data())
+            : null,
+          error: "",
+        });
+      },
+      (reason) => {
+        setState({ key: path, data: null, error: reason.message });
+      },
+    );
   }, [path]);
-  return { data, loading };
+  const active = Boolean(path && firebaseConfigured);
+  const current = active && state.key === path;
+  return {
+    data: current ? state.data : null,
+    loading: active && !current,
+    error: current ? state.error : "",
+  };
 }

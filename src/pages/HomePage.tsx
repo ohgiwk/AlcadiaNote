@@ -1,4 +1,3 @@
-import { where } from "firebase/firestore";
 import { ArrowRight, Plus } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../auth";
@@ -7,13 +6,16 @@ import { useCollection } from "../hooks/useFirestoreData";
 import type { Textbook, UserProgress } from "../types/models";
 export function HomePage() {
   const { user } = useAuth();
-  const { data: books } = useCollection<Textbook>(
-    "textbooks",
-    user ? [where("ownerId", "==", user.uid)] : [],
-  );
+  const { data: books } = useCollection<Textbook>("textbooks", {
+    enabled: Boolean(user),
+    filters: user ? [["ownerId", "==", user.uid]] : [],
+  });
   const { data: progressEntries } = useCollection<UserProgress>(
-    user ? `users/${user.uid}/progress` : "__none__",
-    user ? [where("ownerId", "==", user.uid)] : [],
+    `users/${user?.uid}/progress`,
+    {
+      enabled: Boolean(user),
+      filters: user ? [["ownerId", "==", user.uid]] : [],
+    },
   );
   const progressByTextbook = new Map(
     progressEntries.map((entry) => [entry.textbookId, entry]),

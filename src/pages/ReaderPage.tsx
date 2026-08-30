@@ -1,7 +1,6 @@
 import {
   Bookmark,
   Bot,
-  ChevronLeft,
   ChevronRight,
   GalleryVerticalEnd,
   Highlighter,
@@ -13,7 +12,6 @@ import {
   Settings2,
   Sparkles,
 } from "lucide-react";
-import { where } from "firebase/firestore";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../auth";
@@ -21,12 +19,14 @@ import { ContentRenderer } from "../components/ContentRenderer";
 import { IconButton, Sheet } from "../components/ui";
 import { AIChatPanel } from "../features/reader/AIChatPanel";
 import { ChapterSidebar } from "../features/reader/ChapterSidebar";
+import { ReaderFooter } from "../features/reader/ReaderFooter";
 import { TextbookSearch } from "../features/reader/TextbookSearch";
+import { useReadingProgress } from "../features/reader/useReadingProgress";
 import { useCollection, useDocument } from "../hooks/useFirestoreData";
+import { useMediaQuery } from "../hooks/useMediaQuery";
 import { useTextbook } from "../hooks/useTextbook";
 import {
   requestNextChapterGeneration,
-  saveProgress,
   toggleBookmark,
 } from "../services/firebaseService";
 import type { Bookmark as BookmarkModel, UserProgress } from "../types/models";
@@ -41,8 +41,11 @@ export function ReaderPage() {
   const nav = useNavigate();
   const { book, chapters, pages, loading } = useTextbook(id);
   const bookmarks = useCollection<BookmarkModel>(
-    user ? `users/${user.uid}/bookmarks` : "__none__",
-    user ? [where("ownerId", "==", user.uid)] : [],
+    `users/${user?.uid}/bookmarks`,
+    {
+      enabled: Boolean(user),
+      filters: user ? [["ownerId", "==", user.uid]] : [],
+    },
   ).data;
   const { data: savedProgress } = useDocument<UserProgress>(
     user ? `users/${user.uid}/progress/${id}` : undefined,
@@ -56,9 +59,7 @@ export function ReaderPage() {
   const [toc, setToc] = useState(false);
   const [ai, setAi] = useState(false);
   const [chatOpen, setChatOpen] = useState(true);
-  const [compactReader, setCompactReader] = useState(
-    () => window.matchMedia("(max-width: 800px)").matches,
-  );
+  const compactReader = useMediaQuery("(max-width: 800px)");
   const [searchOpen, setSearchOpen] = useState(false);
   const [bookmarking, setBookmarking] = useState(false);
   const [bookmarkError, setBookmarkError] = useState("");
@@ -70,12 +71,6 @@ export function ReaderPage() {
   );
   const marked = bookmarkedPageIds.has(pageId);
   useEffect(() => {
-    const media = window.matchMedia("(max-width: 800px)");
-    const update = () => setCompactReader(media.matches);
-    media.addEventListener("change", update);
-    return () => media.removeEventListener("change", update);
-  }, []);
-  useEffect(() => {
     if (!moreOpen) return;
     const close = (event: MouseEvent) => {
       if (!moreRef.current?.contains(event.target as Node)) setMoreOpen(false);
@@ -83,16 +78,13 @@ export function ReaderPage() {
     document.addEventListener("mousedown", close);
     return () => document.removeEventListener("mousedown", close);
   }, [moreOpen]);
-  useEffect(() => {
-    document.querySelector(".reader-scroll")?.scrollTo(0, 0);
-    if (user && page && pages.length)
-      void saveProgress(
-        user.uid,
-        id,
-        page.id,
-        Math.round(((idx + 1) / pages.length) * 100),
-      );
-  }, [pageId, user, pages.length, id, idx, page]);
+  useReadingProgress({
+    uid: user?.uid,
+    textbookId: id,
+    page,
+    pageIndex: idx,
+    pageCount: pages.length,
+  });
   if (loading) return <div className="page">教科書を読み込んでいます…</div>;
   if (!book || !page)
     return <div className="page">ページが見つかりません。</div>;
@@ -262,33 +254,14 @@ export function ReaderPage() {
             <Bot />
           </div>
         </div>
-        <footer className="page-nav">
-          <button
-            disabled={idx <= 0}
-            onClick={() =>
-              idx > 0 && nav(`/textbooks/${id}/read/${pages[idx - 1].id}`)
-            }
-          >
-            <ChevronLeft />
-            前のページ
-          </button>
-          <span>
-            {idx + 1} / {pages.length}
-          </span>
-          <button
-            disabled={idx < 0}
-            onClick={() => {
-              if (isChapterEnd && currentChapter) {
-                nav(`/textbooks/${id}/chapters/${currentChapter.id}/quiz`);
-              } else if (idx < pages.length - 1) {
-                nav(`/textbooks/${id}/read/${pages[idx + 1].id}`);
-              }
-            }}
-          >
-            {isChapterEnd ? "章末問題へ" : "次のページ"}
-            <ChevronRight />
-          </button>
-        </footer>
+        <ReaderFooter
+          textbookId={id}
+          pages={pages}
+          pageIndex={idx}
+          currentChapter={currentChapter}
+          isChapterEnd={isChapterEnd}
+          onNavigate={nav}
+        />
       </section>
       {chatOpen && <div className="reader-ai desktop">{chat}</div>}
       <Sheet open={toc} onClose={() => setToc(false)} title="目次">

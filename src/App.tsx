@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { BookOpen, Sparkles } from "lucide-react";
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
+import type { ComponentType } from "react";
 import {
   BrowserRouter,
   Navigate,
@@ -10,18 +11,31 @@ import {
   useNavigate,
 } from "react-router-dom";
 import { AppLayout } from "./layouts/AppLayout";
-import { CreatePage } from "./pages/CreatePage";
-import { FlashcardsPage } from "./pages/FlashcardsPage";
-import { HomePage } from "./pages/HomePage";
-import {
-  DashboardPage,
-  KnowledgeMapPage,
-  RoadmapPage,
-} from "./pages/LearningPages";
-import { LibraryPage } from "./pages/LibraryPage";
-import { NotesPage } from "./pages/NotesPage";
-import { QuizPage } from "./pages/QuizPage";
-import { ReaderPage } from "./pages/ReaderPage";
+
+const route = <T extends Record<string, unknown>, K extends keyof T>(
+  loader: () => Promise<T>,
+  name: K,
+) => lazy(async () => ({ default: (await loader())[name] as ComponentType }));
+
+const HomePage = route(() => import("./pages/HomePage"), "HomePage");
+const CreatePage = route(() => import("./pages/CreatePage"), "CreatePage");
+const LibraryPage = route(() => import("./pages/LibraryPage"), "LibraryPage");
+const ReaderPage = route(() => import("./pages/ReaderPage"), "ReaderPage");
+const NotesPage = route(() => import("./pages/NotesPage"), "NotesPage");
+const QuizPage = route(() => import("./pages/QuizPage"), "QuizPage");
+const FlashcardsPage = route(
+  () => import("./pages/FlashcardsPage"),
+  "FlashcardsPage",
+);
+const RoadmapPage = route(() => import("./pages/LearningPages"), "RoadmapPage");
+const KnowledgeMapPage = route(
+  () => import("./pages/LearningPages"),
+  "KnowledgeMapPage",
+);
+const DashboardPage = route(
+  () => import("./pages/LearningPages"),
+  "DashboardPage",
+);
 function Splash() {
   const nav = useNavigate();
   useEffect(() => {
@@ -58,28 +72,35 @@ function AnimatedRoutes() {
         transition={{ duration: 0.18 }}
         className="route-frame"
       >
-        <Routes location={location}>
-          <Route path="/" element={<Splash />} />
-          <Route element={<AppLayout />}>
-            <Route path="/home" element={<HomePage />} />
-            <Route path="/create" element={<CreatePage />} />
-            <Route path="/library" element={<LibraryPage />} />
-            <Route path="/roadmap" element={<RoadmapPage />} />
-            <Route path="/knowledge-map" element={<KnowledgeMapPage />} />
-            <Route path="/dashboard" element={<DashboardPage />} />
-          </Route>
-          <Route path="/textbooks/:id/read/:pageId" element={<ReaderPage />} />
-          <Route path="/textbooks/:id/notes" element={<NotesPage />} />
-          <Route
-            path="/textbooks/:id/chapters/:chapterId/quiz"
-            element={<QuizPage />}
-          />
-          <Route
-            path="/textbooks/:id/flashcards"
-            element={<FlashcardsPage />}
-          />
-          <Route path="*" element={<Navigate to="/home" />} />
-        </Routes>
+        <Suspense
+          fallback={<div className="app-loading">画面を読み込んでいます…</div>}
+        >
+          <Routes location={location}>
+            <Route path="/" element={<Splash />} />
+            <Route element={<AppLayout />}>
+              <Route path="/home" element={<HomePage />} />
+              <Route path="/create" element={<CreatePage />} />
+              <Route path="/library" element={<LibraryPage />} />
+              <Route path="/roadmap" element={<RoadmapPage />} />
+              <Route path="/knowledge-map" element={<KnowledgeMapPage />} />
+              <Route path="/dashboard" element={<DashboardPage />} />
+            </Route>
+            <Route
+              path="/textbooks/:id/read/:pageId"
+              element={<ReaderPage />}
+            />
+            <Route path="/textbooks/:id/notes" element={<NotesPage />} />
+            <Route
+              path="/textbooks/:id/chapters/:chapterId/quiz"
+              element={<QuizPage />}
+            />
+            <Route
+              path="/textbooks/:id/flashcards"
+              element={<FlashcardsPage />}
+            />
+            <Route path="*" element={<Navigate to="/home" />} />
+          </Routes>
+        </Suspense>
       </motion.div>
     </AnimatePresence>
   );

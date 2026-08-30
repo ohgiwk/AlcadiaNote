@@ -13,9 +13,9 @@ export function NotesPage() {
   const { user } = useAuth();
   const { book, pages, loading } = useTextbook(id);
   const page = pages[0];
-  const { data: notes } = useCollection<Note>(
-    user ? `users/${user.uid}/notes` : "__none__",
-  );
+  const { data: notes } = useCollection<Note>(`users/${user?.uid}/notes`, {
+    enabled: Boolean(user),
+  });
   const [saving, setSaving] = useState(false);
   async function add(text: string) {
     if (!user || !page) return;
