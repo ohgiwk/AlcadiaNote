@@ -1,0 +1,247 @@
+@media (max-width: 1100px) {
+  .reader {
+    grid-template-columns: minmax(430px, 1fr) 300px;
+  }
+  .reader.chat-closed {
+    grid-template-columns: minmax(430px, 1fr);
+  }
+  .reader-toc.desktop {
+    display: none;
+  }
+  .reader-toolbar > .icon-button:first-child {
+    display: grid;
+  }
+  .library-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .dashboard-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 800px) {
+  .app-shell {
+    display: block;
+  }
+  .main-nav {
+    transform: translateX(-100%);
+    transition: transform 0.24s;
+    box-shadow: var(--shadow);
+  }
+  .main-nav.open {
+    transform: translateX(0);
+  }
+  .app-main {
+    min-height: 100vh;
+  }
+  .topbar > .icon-button {
+    display: grid;
+  }
+  .topbar {
+    padding: 0 15px;
+  }
+  .top-streak {
+    display: none;
+  }
+  .page {
+    padding: 35px 20px 70px;
+  }
+  .welcome,
+  .title-row {
+    align-items: flex-start;
+  }
+  .welcome {
+    display: grid;
+  }
+  .stat-grid {
+    grid-template-columns: 1fr;
+  }
+  .book-grid,
+  .library-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px 14px;
+  }
+  .recommend {
+    padding: 28px;
+  }
+  .orbit {
+    display: none;
+  }
+  .library-tools {
+    flex-wrap: wrap;
+  }
+  .library-tools > label {
+    width: 100%;
+  }
+  .filter-pills {
+    overflow: auto;
+  }
+  .sort {
+    margin-left: 0;
+  }
+  .create-page {
+    grid-template-columns: 1fr;
+    gap: 30px;
+  }
+  .create-intro h1 {
+    font-size: 29px;
+  }
+  .create-mark {
+    width: 62px;
+    height: 62px;
+    margin-bottom: 18px;
+  }
+  .reader {
+    grid-template-columns: 1fr;
+  }
+  .reader-ai.desktop {
+    display: none;
+  }
+  .reader-scroll {
+    padding: 18px;
+  }
+  .paper {
+    padding: 42px 28px;
+  }
+  .reader-toolbar .crumb {
+    display: none;
+  }
+  .notes-layout {
+    grid-template-columns: 1fr;
+  }
+  .notebook {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+  .map-canvas {
+    height: 520px;
+  }
+  .map-canvas aside {
+    width: 200px;
+  }
+  .roadmap article {
+    grid-template-columns: 52px 1fr;
+  }
+  .roadmap article > button {
+    grid-column: 2;
+    width: max-content;
+  }
+  .rating > div {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .flashcard {
+    height: 330px;
+  }
+  .global-search {
+    margin-left: 10px;
+  }
+  .global-search kbd {
+    display: none;
+  }
+}
+@media (max-width: 480px) {
+  .welcome .button {
+    width: 100%;
+  }
+  .continue-card {
+    padding: 16px;
+    gap: 14px;
+  }
+  .mini-cover {
+    width: 72px;
+    height: 100px;
+  }
+  .continue-copy h2 {
+    font-size: 16px;
+  }
+  .continue-copy .progress,
+  .continue-copy small {
+    display: none;
+  }
+  .round-link {
+    width: 38px;
+    height: 38px;
+  }
+  .book-cover {
+    padding: 15px;
+  }
+  .book-cover h3 {
+    font-size: 16px;
+  }
+  .book-cover p {
+    display: none;
+  }
+  .choice-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .create-form {
+    padding: 20px;
+  }
+  .reader-center {
+    grid-template-rows: 56px 1fr 54px;
+  }
+  .reader-scroll {
+    padding: 0;
+  }
+  .paper {
+    border: 0;
+    box-shadow: none;
+    padding: 38px 24px;
+  }
+  .reader-toolbar {
+    padding: 0 7px;
+  }
+  .reader-toolbar .icon-button {
+    width: 37px;
+  }
+  .page-nav {
+    padding: 0 10px;
+  }
+  .chapter-sidebar {
+    border: 0;
+  }
+  .ai-panel {
+    border: 0;
+  }
+  .quiz-page main {
+    padding-top: 6vh;
+  }
+  .roadmap article {
+    gap: 12px;
+  }
+  .roadmap article > button {
+    font-size: 10px;
+  }
+  .map-legend {
+    display: none;
+  }
+  .map-canvas {
+    margin: 0 -10px;
+  }
+  .dashboard-stats {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .dashboard-stats .stat-card strong {
+    font-size: 17px;
+  }
+  .global-search span {
+    font-size: 0;
+  }
+  .global-search span:after {
+    content: "検索";
+    font-size: 12px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *:before,
+  *:after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

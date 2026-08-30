@@ -1,0 +1,138 @@
+.app-loading {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  font-family: inherit;
+  color: #506070;
+}
+.form-error {
+  color: #a43d3d;
+}
+.page-sources {
+  margin-top: 3rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #d8d2c5;
+}
+.page-sources h2 {
+  font-size: 1rem;
+}
+.page-sources a {
+  color: #315f91;
+}
+.profile {
+  width: 100%;
+  border: 0;
+  text-align: left;
+  cursor: pointer;
+}
+.auth-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 10px;
+  background: #eef0f3;
+}
+.auth-dialog-content {
+  min-height: 0;
+  padding: 24px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.auth-tabs button {
+  min-height: 40px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 600;
+  cursor: pointer;
+}
+.auth-tabs button.active {
+  background: white;
+  color: var(--ink);
+  box-shadow: 0 2px 7px rgba(20, 30, 45, 0.08);
+}
+.auth-description {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.auth-form,
+.auth-form label {
+  display: grid;
+  gap: 8px;
+}
+.auth-form {
+  gap: 15px;
+}
+.auth-form label {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+.auth-form input {
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 0 12px;
+  background: white;
+  color: var(--ink);
+  font: inherit;
+}
+.auth-form .button,
+.auth-account .button,
+.google-auth {
+  width: 100%;
+}
+.auth-divider {
+  position: relative;
+  margin: 18px 0;
+  border-top: 1px solid var(--line);
+  text-align: center;
+}
+.auth-divider span {
+  position: relative;
+  top: -10px;
+  padding: 0 10px;
+  background: white;
+  color: var(--muted);
+  font-size: 11px;
+}
+.google-auth {
+  margin-top: -8px;
+}
+.auth-account {
+  display: grid;
+  gap: 16px;
+  text-align: center;
+}
+.auth-avatar {
+  width: 64px;
+  height: 64px;
+  margin: 4px auto 0;
+  border-radius: 50%;
+  background: #dfe5ef;
+  display: grid;
+  place-items: center;
+  color: var(--ink);
+  font-size: 22px;
+  font-weight: 700;
+}
+.auth-account p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+@media (max-width: 480px) {
+  .dialog-scrim {
+    padding: 12px;
+  }
+  .dialog-sheet {
+    max-height: calc(100dvh - 24px);
+    border-radius: 16px;
+  }
+  .auth-dialog-content {
+    padding: 18px;
+  }
+}
