@@ -457,14 +457,33 @@ a {
 .mini-cover.cobalt {
   background: linear-gradient(145deg, #1b315d, #3264a3);
 }
-.book-cover.terracotta {
+.book-cover.terracotta,
+.mini-cover.terracotta {
   background: linear-gradient(145deg, #702d24, #b45a3f);
 }
-.book-cover.sage {
+.book-cover.sage,
+.mini-cover.sage {
   background: linear-gradient(145deg, #2e554d, #629080);
 }
-.book-cover.violet {
+.book-cover.violet,
+.mini-cover.violet {
   background: linear-gradient(145deg, #3f345f, #7563a3);
+}
+.book-cover.amber,
+.mini-cover.amber {
+  background: linear-gradient(145deg, #6d4517, #c58a32);
+}
+.book-cover.rose,
+.mini-cover.rose {
+  background: linear-gradient(145deg, #713447, #b9617a);
+}
+.book-cover.teal,
+.mini-cover.teal {
+  background: linear-gradient(145deg, #184e55, #3a8990);
+}
+.book-cover.slate,
+.mini-cover.slate {
+  background: linear-gradient(145deg, #303b4c, #66758d);
 }
 .cover-rule {
   position: absolute;

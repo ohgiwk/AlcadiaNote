@@ -22,6 +22,21 @@ const openAiKey = defineSecret("OPENAI_API_KEY");
 const openAiModel = defineString("OPENAI_MODEL", { default: "gpt-5-mini" });
 const allowedLevels = ["初心者", "中級", "上級", "AIに任せる"];
 const allowedPurposes = ["趣味", "仕事", "資格", "教養"];
+const coverStyles = [
+  "cobalt",
+  "terracotta",
+  "sage",
+  "violet",
+  "amber",
+  "rose",
+  "teal",
+  "slate",
+];
+
+function randomCoverStyle() {
+  return coverStyles[Math.floor(Math.random() * coverStyles.length)];
+}
+
 export const createTextbook = onCall(
   { enforceAppCheck: false },
   async (request) => {
@@ -59,6 +74,7 @@ export const createTextbook = onCall(
     const book = db.collection("textbooks").doc();
     const job = db.collection("generationJobs").doc();
     const generationLockRef = db.doc(`generationLocks/${request.auth.uid}`);
+    const cover = randomCoverStyle();
     const now = FieldValue.serverTimestamp();
     await db.runTransaction(async (tx) => {
       const generationLock = await tx.get(generationLockRef);
@@ -74,7 +90,7 @@ export const createTextbook = onCall(
         title: topic,
         subtitle: "生成中…",
         category: "AI教科書",
-        cover: "cobalt",
+        cover,
         progress: 0,
         favorite: false,
         chapterIds: [],
