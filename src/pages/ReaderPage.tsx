@@ -39,6 +39,10 @@ export function ReaderPage() {
     user ? `users/${user.uid}/progress/${id}` : undefined,
   );
   const page = pages.find((x) => x.id === pageId);
+  const currentChapter = chapters.find(
+    (chapter) => chapter.id === page?.chapterId,
+  );
+  const isChapterEnd = currentChapter?.pageIds.at(-1) === pageId;
   const idx = pages.indexOf(page!);
   const [toc, setToc] = useState(false);
   const [ai, setAi] = useState(false);
@@ -201,14 +205,16 @@ export function ReaderPage() {
             {idx + 1} / {pages.length}
           </span>
           <button
-            disabled={idx < 0 || idx === pages.length - 1}
-            onClick={() =>
-              idx >= 0 &&
-              idx < pages.length - 1 &&
-              nav(`/textbooks/${id}/read/${pages[idx + 1].id}`)
-            }
+            disabled={idx < 0}
+            onClick={() => {
+              if (isChapterEnd && currentChapter) {
+                nav(`/textbooks/${id}/chapters/${currentChapter.id}/quiz`);
+              } else if (idx < pages.length - 1) {
+                nav(`/textbooks/${id}/read/${pages[idx + 1].id}`);
+              }
+            }}
           >
-            次のページ
+            {isChapterEnd ? "章末問題へ" : "次のページ"}
             <ChevronRight />
           </button>
         </footer>

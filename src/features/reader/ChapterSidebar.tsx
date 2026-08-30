@@ -1,4 +1,4 @@
-import { Bookmark, Check, ChevronDown, Circle } from "lucide-react";
+import { Bookmark, Check, ChevronDown, Circle, CircleHelp } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import type { Chapter, Page, Textbook } from "../../types/models";
 export function ChapterSidebar({
@@ -58,6 +58,16 @@ export function ChapterSidebar({
                 </NavLink>
               ) : null;
             })}
+            <NavLink
+              className="chapter-quiz-link"
+              to={`/textbooks/${book.id}/chapters/${c.id}/quiz`}
+            >
+              <CircleHelp size={14} />
+              <span>
+                章末確認問題
+                <small>5問</small>
+              </span>
+            </NavLink>
           </section>
         ))}
       </nav>

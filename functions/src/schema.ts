@@ -38,7 +38,7 @@ const quiz = {
   additionalProperties: false,
   required: ["type", "prompt", "options", "answer", "explanation"],
   properties: {
-    type: { type: "string", enum: ["choice", "truefalse", "written"] },
+    type: { type: "string", enum: ["choice", "truefalse"] },
     prompt: { type: "string" },
     options: stringArray,
     answer: { type: "string" },
@@ -48,22 +48,22 @@ const quiz = {
 const page = {
   type: "object",
   additionalProperties: false,
-  required: ["title", "readMinutes", "blocks", "sources", "quiz"],
+  required: ["title", "readMinutes", "blocks", "sources"],
   properties: {
     title: { type: "string" },
     readMinutes: { type: "integer" },
     blocks: { type: "array", items: block },
     sources: { type: "array", items: source },
-    quiz,
   },
 } as const;
 const chapter = {
   type: "object",
   additionalProperties: false,
-  required: ["title", "pages"],
+  required: ["title", "pages", "quizzes"],
   properties: {
     title: { type: "string" },
     pages: { type: "array", minItems: 3, maxItems: 3, items: page },
+    quizzes: { type: "array", minItems: 5, maxItems: 5, items: quiz },
   },
 } as const;
 const flashcard = {

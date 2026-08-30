@@ -70,7 +70,10 @@ function AnimatedRoutes() {
           </Route>
           <Route path="/textbooks/:id/read/:pageId" element={<ReaderPage />} />
           <Route path="/textbooks/:id/notes" element={<NotesPage />} />
-          <Route path="/textbooks/:id/quiz" element={<QuizPage />} />
+          <Route
+            path="/textbooks/:id/chapters/:chapterId/quiz"
+            element={<QuizPage />}
+          />
           <Route
             path="/textbooks/:id/flashcards"
             element={<FlashcardsPage />}

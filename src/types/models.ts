@@ -113,7 +113,9 @@ export interface Textbook extends BaseEntity {
   generationJobId?: ID;
 }
 export interface Quiz extends BaseEntity {
-  pageId: ID;
+  pageId?: ID;
+  chapterId?: ID;
+  order?: number;
   type: "choice" | "truefalse" | "written" | "code";
   prompt: string;
   options?: string[];

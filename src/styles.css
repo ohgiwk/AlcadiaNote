@@ -1111,6 +1111,17 @@ a {
   background: #eaf0fb;
   color: #234f9c;
 }
+.chapter-sidebar nav a.chapter-quiz-link {
+  margin-top: 4px;
+  border: 1px solid #dce4f1;
+  background: #f7f9fd;
+  color: #315f91;
+}
+.chapter-sidebar nav a.chapter-quiz-link:hover,
+.chapter-sidebar nav a.chapter-quiz-link.active {
+  border-color: #b9cbea;
+  background: #edf3ff;
+}
 .chapter-sidebar nav a > span {
   display: grid;
   gap: 4px;
@@ -1802,6 +1813,12 @@ a {
 .feedback p {
   font-size: 11px;
   margin: 5px 0;
+}
+.feedback .correct-answer {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid currentColor;
+  font-size: 12px;
 }
 .quiz-next {
   margin: 28px 0 0 auto;

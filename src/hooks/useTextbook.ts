@@ -22,6 +22,7 @@ export function useTextbook(id?: string) {
     pages: pages.data,
     quizzes: quizzes.data,
     flashcards: flashcards.data,
-    loading: book.loading || chapters.loading || pages.loading,
+    loading:
+      book.loading || chapters.loading || pages.loading || quizzes.loading,
   };
 }

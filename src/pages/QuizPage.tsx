@@ -6,16 +6,41 @@ import { Progress } from "../components/ui";
 import { useTextbook } from "../hooks/useTextbook";
 import { saveQuizAttempt } from "../services/firebaseService";
 export function QuizPage() {
-  const { id = "" } = useParams();
+  const { id = "", chapterId = "" } = useParams();
   const { user } = useAuth();
-  const { book, quizzes, loading } = useTextbook(id);
+  const { book, chapters, quizzes, loading } = useTextbook(id);
   const [index, setIndex] = useState(0);
   const [selected, setSelected] = useState("");
   const [checked, setChecked] = useState(false);
   const [score, setScore] = useState(0);
+  const chapter = chapters.find((item) => item.id === chapterId);
+  const chapterQuizzes = quizzes
+    .filter(
+      (quiz) =>
+        !chapterId ||
+        quiz.chapterId === chapterId ||
+        (!quiz.chapterId &&
+          Boolean(quiz.pageId && chapter?.pageIds.includes(quiz.pageId))),
+    )
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const nextChapter = chapter
+    ? chapters.find((item) => item.order === chapter.order + 1)
+    : undefined;
   if (loading) return <div className="page">問題を読み込んでいます…</div>;
-  const done = index >= quizzes.length;
-  if (!quizzes.length) return <div className="page">問題がありません。</div>;
+  const done = index >= chapterQuizzes.length;
+  if (!chapterQuizzes.length)
+    return (
+      <div className="page result">
+        <h1>この章の確認問題はまだありません。</h1>
+        <p>既存の教科書は、再生成すると各章5問の形式になります。</p>
+        <Link
+          className="button primary"
+          to={`/textbooks/${id}/read/${chapter?.pageIds.at(-1) ?? book?.firstPageId}`}
+        >
+          教科書へ戻る
+        </Link>
+      </div>
+    );
   if (done)
     return (
       <div className="page result">
@@ -25,12 +50,19 @@ export function QuizPage() {
         <span className="eyebrow">SESSION COMPLETE</span>
         <h1>よくできました。</h1>
         <strong>
-          {score} / {quizzes.length}
+          {score} / {chapterQuizzes.length}
         </strong>
-        <Progress value={Math.round((score / quizzes.length) * 100)} />
+        <Progress value={Math.round((score / chapterQuizzes.length) * 100)} />
         <div>
-          <Link className="button primary" to={`/textbooks/${id}/flashcards`}>
-            暗記カードで復習
+          <Link
+            className="button primary"
+            to={
+              nextChapter
+                ? `/textbooks/${id}/read/${nextChapter.pageIds[0]}`
+                : `/textbooks/${id}/flashcards`
+            }
+          >
+            {nextChapter ? "次の章へ進む" : "暗記カードで復習"}
           </Link>
           <button
             className="button"
@@ -47,20 +79,26 @@ export function QuizPage() {
         </div>
       </div>
     );
-  const q = quizzes[index];
-  const correct = selected === q.answer || q.type === "written";
+  const q = chapterQuizzes[index];
+  const correct =
+    selected.trim().toLocaleLowerCase("ja") ===
+    q.answer.trim().toLocaleLowerCase("ja");
   return (
     <div className="quiz-page">
       <header>
-        <Link to={`/textbooks/${id}/read/${book?.firstPageId}`}>
+        <Link
+          to={`/textbooks/${id}/read/${chapter?.pageIds.at(-1) ?? book?.firstPageId}`}
+        >
           ← 教科書へ
         </Link>
-        <span>章末チェック</span>
+        <span>
+          {chapter ? `第${chapter.order}章 章末チェック` : "章末チェック"}
+        </span>
         <strong>
-          {index + 1} / {quizzes.length}
+          {index + 1} / {chapterQuizzes.length}
         </strong>
       </header>
-      <Progress value={((index + 1) / quizzes.length) * 100} />
+      <Progress value={((index + 1) / chapterQuizzes.length) * 100} />
       <main>
         <span className="eyebrow">
           QUESTION {String(index + 1).padStart(2, "0")}
@@ -70,6 +108,7 @@ export function QuizPage() {
           <textarea
             className="written-answer"
             value={selected}
+            disabled={checked}
             onChange={(e) => setSelected(e.target.value)}
             placeholder="自分の言葉で説明してみましょう…"
           />
@@ -93,6 +132,10 @@ export function QuizPage() {
         {checked && (
           <aside className={correct ? "feedback correct" : "feedback"}>
             <strong>{correct ? "正解です" : "もう一度確認しましょう"}</strong>
+            <p className="correct-answer">
+              <b>正解：</b>
+              {q.answer}
+            </p>
             <p>{q.explanation}</p>
           </aside>
         )}
@@ -112,7 +155,11 @@ export function QuizPage() {
             }
           }}
         >
-          {checked ? "次の問題" : "答えを確認"}
+          {checked
+            ? index === chapterQuizzes.length - 1
+              ? "結果を確認"
+              : "次の問題"
+            : "答えを確認"}
           <ChevronRight />
         </button>
       </main>
