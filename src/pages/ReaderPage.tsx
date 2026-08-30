@@ -3,6 +3,7 @@ import {
   Bot,
   ChevronLeft,
   ChevronRight,
+  GalleryVerticalEnd,
   Highlighter,
   List,
   MoreHorizontal,
@@ -142,11 +143,19 @@ export function ReaderPage() {
             >
               <NotebookPen size={19} />
             </Link>
+            <Link
+              className="icon-button"
+              aria-label="暗記カード"
+              title="暗記カード"
+              to={`/textbooks/${id}/flashcards`}
+            >
+              <GalleryVerticalEnd size={19} />
+            </Link>
             <IconButton label="AIチャット" onClick={() => setAi(true)}>
               <Sparkles size={19} />
             </IconButton>
             <Link
-              className="icon-button"
+              className="icon-button reader-regenerate-link"
               aria-label="条件を変えて再生成"
               to="/create"
               state={{

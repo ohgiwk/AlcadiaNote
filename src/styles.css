@@ -2650,7 +2650,7 @@ a {
   .reader-toolbar .icon-button {
     width: 37px;
   }
-  .reader-toolbar > div:last-child .icon-button:nth-child(5) {
+  .reader-toolbar .reader-regenerate-link {
     display: none;
   }
   .page-nav {
