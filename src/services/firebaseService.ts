@@ -115,8 +115,10 @@ export async function saveProgress(
   const progressRef = doc(db, `users/${uid}/progress/${textbookId}`);
   await runTransaction(db, async (transaction) => {
     const current = await transaction.get(progressRef);
-    if (current.exists() && Number(current.data().percent ?? 0) >= percent)
+    if (current.exists() && Number(current.data().percent ?? 0) >= percent) {
+      transaction.update(progressRef, { updatedAt: serverTimestamp() });
       return;
+    }
     const data = {
       ownerId: uid,
       textbookId,

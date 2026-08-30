@@ -628,6 +628,14 @@ a {
   gap: 7px;
   padding: 0 12px;
 }
+.sort select {
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
 .library-grid {
   grid-template-columns: repeat(4, 1fr);
 }
@@ -2722,9 +2730,6 @@ a {
   .global-search span:after {
     content: "検索";
     font-size: 12px;
-  }
-  .library-tools .sort {
-    display: none;
   }
 }
 @media (prefers-reduced-motion: reduce) {
