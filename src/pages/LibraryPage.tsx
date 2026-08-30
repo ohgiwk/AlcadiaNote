@@ -98,6 +98,7 @@ export function LibraryPage() {
             <BookCover
               key={x.id}
               book={x}
+              showGenerationConditions
               deleting={deletingId === x.id}
               onRegenerate={() =>
                 navigate("/create", {

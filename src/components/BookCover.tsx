@@ -1,4 +1,11 @@
-import { BookOpen, Heart, RefreshCw, Trash2 } from "lucide-react";
+import {
+  BookOpen,
+  Heart,
+  MoreHorizontal,
+  RefreshCw,
+  Trash2,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import type { Textbook } from "../types/models";
 import { Progress } from "./ui";
@@ -8,18 +15,30 @@ export function BookCover({
   onDelete,
   onRegenerate,
   deleting = false,
+  showGenerationConditions = false,
 }: {
   book: Textbook;
   compact?: boolean;
   onDelete?: () => void;
   onRegenerate?: () => void;
   deleting?: boolean;
+  showGenerationConditions?: boolean;
 }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const ready = book.generationStatus === "completed" && book.firstPageId;
   const needsApproval =
     book.generationStatus === "awaiting_approval" && book.generationJobId;
+  useEffect(() => {
+    if (!menuOpen) return;
+    function closeMenu(event: MouseEvent) {
+      if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false);
+    }
+    document.addEventListener("mousedown", closeMenu);
+    return () => document.removeEventListener("mousedown", closeMenu);
+  }, [menuOpen]);
   return (
-    <article className="book-card-container">
+    <article className={`book-card-container ${menuOpen ? "menu-open" : ""}`}>
       <Link
         to={
           ready
@@ -60,38 +79,64 @@ export function BookCover({
                 ? "構成の確認待ち"
                 : "生成状況を確認中"}
           </span>
+          {showGenerationConditions && (book.level || book.purpose) && (
+            <div className="book-conditions">
+              {book.level && <span>難易度：{book.level}</span>}
+              {book.purpose && <span>目的：{book.purpose}</span>}
+            </div>
+          )}
           <Progress value={book.progress} />
         </div>
       </Link>
       {(onRegenerate || onDelete) && (
-        <div className="book-actions">
-          {onRegenerate && (
-            <button
-              type="button"
-              className="book-regenerate"
-              disabled={book.generationStatus !== "completed"}
-              onClick={onRegenerate}
-            >
-              <RefreshCw size={16} />
-              条件を変えて再生成
-            </button>
-          )}
-          {onDelete && (
-            <button
-              type="button"
-              className="book-delete"
-              disabled={
-                deleting ||
-                !["completed", "failed", "awaiting_approval"].includes(
-                  book.generationStatus ?? "",
-                )
-              }
-              onClick={onDelete}
-              aria-label={`${book.title}を削除`}
-            >
-              <Trash2 size={16} />
-              {deleting ? "削除中…" : "削除"}
-            </button>
+        <div className="book-actions" ref={menuRef}>
+          <button
+            type="button"
+            className="book-menu-trigger"
+            aria-label={`${book.title}の操作メニュー`}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen((open) => !open)}
+          >
+            <MoreHorizontal size={20} />
+          </button>
+          {menuOpen && (
+            <div className="book-menu" role="menu">
+              {onRegenerate && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={book.generationStatus !== "completed"}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onRegenerate();
+                  }}
+                >
+                  <RefreshCw size={16} />
+                  条件を変えて再生成
+                </button>
+              )}
+              {onDelete && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="danger"
+                  disabled={
+                    deleting ||
+                    !["completed", "failed", "awaiting_approval"].includes(
+                      book.generationStatus ?? "",
+                    )
+                  }
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onDelete();
+                  }}
+                >
+                  <Trash2 size={16} />
+                  {deleting ? "削除中…" : "削除"}
+                </button>
+              )}
+            </div>
           )}
         </div>
       )}

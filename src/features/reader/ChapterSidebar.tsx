@@ -1,14 +1,16 @@
-import { Check, ChevronDown, Circle } from "lucide-react";
+import { Bookmark, Check, ChevronDown, Circle } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import type { Chapter, Page, Textbook } from "../../types/models";
 export function ChapterSidebar({
   book,
   chapters,
   pages,
+  bookmarkedPageIds = new Set<string>(),
 }: {
   book: Textbook;
   chapters: Chapter[];
   pages: Page[];
+  bookmarkedPageIds?: Set<string>;
 }) {
   return (
     <aside className="chapter-sidebar">
@@ -38,7 +40,17 @@ export function ChapterSidebar({
                   )}
                   <span>
                     {p.title}
-                    <small>{p.readMinutes}分</small>
+                    <small>
+                      {p.readMinutes}分
+                      {bookmarkedPageIds.has(p.id) && (
+                        <Bookmark
+                          className="toc-bookmark"
+                          size={11}
+                          fill="currentColor"
+                          aria-label="ブックマーク済み"
+                        />
+                      )}
+                    </small>
                   </span>
                 </NavLink>
               ) : null;

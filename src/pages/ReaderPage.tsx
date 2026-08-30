@@ -12,6 +12,7 @@ import {
   Settings2,
   Sparkles,
 } from "lucide-react";
+import { where } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../auth";
@@ -19,6 +20,7 @@ import { ContentRenderer } from "../components/ContentRenderer";
 import { IconButton, Sheet } from "../components/ui";
 import { AIChatPanel } from "../features/reader/AIChatPanel";
 import { ChapterSidebar } from "../features/reader/ChapterSidebar";
+import { TextbookSearch } from "../features/reader/TextbookSearch";
 import { useCollection } from "../hooks/useFirestoreData";
 import { useTextbook } from "../hooks/useTextbook";
 import { saveProgress, toggleBookmark } from "../services/firebaseService";
@@ -31,12 +33,19 @@ export function ReaderPage() {
   const { book, chapters, pages, loading } = useTextbook(id);
   const bookmarks = useCollection<BookmarkModel>(
     user ? `users/${user.uid}/bookmarks` : "__none__",
+    user ? [where("ownerId", "==", user.uid)] : [],
   ).data;
   const page = pages.find((x) => x.id === pageId);
   const idx = pages.indexOf(page!);
   const [toc, setToc] = useState(false);
   const [ai, setAi] = useState(false);
-  const marked = bookmarks.some((x) => x.pageId === pageId);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [bookmarking, setBookmarking] = useState(false);
+  const [bookmarkError, setBookmarkError] = useState("");
+  const bookmarkedPageIds = new Set(
+    bookmarks.filter((x) => x.textbookId === id).map((x) => x.pageId),
+  );
+  const marked = bookmarkedPageIds.has(pageId);
   useEffect(() => {
     document.querySelector(".reader-scroll")?.scrollTo(0, 0);
     if (user && page && pages.length)
@@ -50,8 +59,30 @@ export function ReaderPage() {
   if (loading) return <div className="page">教科書を読み込んでいます…</div>;
   if (!book || !page)
     return <div className="page">ページが見つかりません。</div>;
+  const currentPageId = page.id;
+  async function changeBookmark() {
+    if (!user || bookmarking) return;
+    setBookmarkError("");
+    setBookmarking(true);
+    try {
+      await toggleBookmark(user.uid, id, currentPageId);
+    } catch (error) {
+      setBookmarkError(
+        error instanceof Error
+          ? error.message
+          : "ブックマークを更新できませんでした",
+      );
+    } finally {
+      setBookmarking(false);
+    }
+  }
   const sidebar = (
-    <ChapterSidebar book={book} chapters={chapters} pages={pages} />
+    <ChapterSidebar
+      book={book}
+      chapters={chapters}
+      pages={pages}
+      bookmarkedPageIds={bookmarkedPageIds}
+    />
   );
   const chat = <AIChatPanel textbookId={id} pageId={page.id} />;
   return (
@@ -68,12 +99,14 @@ export function ReaderPage() {
             <span>{book.title}</span>
           </div>
           <div>
-            <IconButton label="本文を検索">
+            <IconButton label="本文を検索" onClick={() => setSearchOpen(true)}>
               <Search size={19} />
             </IconButton>
             <IconButton
-              label="ブックマーク"
-              onClick={() => user && void toggleBookmark(user.uid, id, page.id)}
+              label={marked ? "ブックマークを解除" : "ブックマークに追加"}
+              aria-pressed={marked}
+              disabled={!user || bookmarking}
+              onClick={() => void changeBookmark()}
             >
               <Bookmark size={19} fill={marked ? "currentColor" : "none"} />
             </IconButton>
@@ -108,6 +141,11 @@ export function ReaderPage() {
             </IconButton>
           </div>
         </header>
+        {bookmarkError && (
+          <div className="reader-notice" role="alert">
+            {bookmarkError}
+          </div>
+        )}
         <div className="reader-scroll">
           <article className="paper">
             <header>
@@ -177,6 +215,20 @@ export function ReaderPage() {
       </Sheet>
       <Sheet open={ai} onClose={() => setAi(false)} title="Arcadia AI">
         {chat}
+      </Sheet>
+      <Sheet
+        open={searchOpen}
+        onClose={() => setSearchOpen(false)}
+        title="教科書内を検索"
+        variant="dialog"
+      >
+        <TextbookSearch
+          pages={pages}
+          onSelect={(selectedPageId) => {
+            setSearchOpen(false);
+            nav(`/textbooks/${id}/read/${selectedPageId}`);
+          }}
+        />
       </Sheet>
     </div>
   );

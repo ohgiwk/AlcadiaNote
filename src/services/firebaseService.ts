@@ -57,6 +57,7 @@ export async function toggleBookmark(
   const found = await getDocs(
     query(
       collection(db, `users/${uid}/bookmarks`),
+      where("ownerId", "==", uid),
       where("textbookId", "==", textbookId),
       where("pageId", "==", pageId),
     ),

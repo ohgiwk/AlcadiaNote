@@ -143,6 +143,7 @@ export interface Highlight extends BaseEntity {
   color: string;
 }
 export interface Bookmark extends BaseEntity {
+  textbookId: ID;
   pageId: ID;
 }
 export interface UserProgress extends BaseEntity {
