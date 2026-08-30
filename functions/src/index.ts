@@ -1,19 +1,17 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { initializeApp } from "firebase-admin/app";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { setGlobalOptions } from "firebase-functions/v2";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
-import {
-  onDocumentCreated,
-  onDocumentUpdated,
-} from "firebase-functions/v2/firestore";
+import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { defineSecret, defineString } from "firebase-functions/params";
-import { chapterContentSchema, textbookOutlineSchema } from "./schema.js";
-import {
-  containsGenerationMeta,
-  withoutInlineLinks,
-  withoutPageNumberPrefix,
-} from "./sanitize.js";
+import { queueChapterContentWrites } from "./chapter-writes.js";
+import { generateChapter, generateOutline } from "./generation.js";
+import { outputText } from "./openai.js";
+import type {
+  OutlineChapter,
+  TextbookGenerationInput,
+  TextbookOutline,
+} from "./types.js";
 
 initializeApp();
 setGlobalOptions({ region: "asia-northeast1", maxInstances: 10 });
@@ -32,6 +30,10 @@ const coverStyles = [
   "teal",
   "slate",
 ];
+
+function generationConfig() {
+  return { apiKey: openAiKey.value(), model: openAiModel.value() };
+}
 
 function randomCoverStyle() {
   return coverStyles[Math.floor(Math.random() * coverStyles.length)];
@@ -128,167 +130,6 @@ export const createTextbook = onCall(
   },
 );
 
-function outputText(response: any) {
-  if (typeof response.output_text === "string") return response.output_text;
-  return (response.output ?? [])
-    .flatMap((o: any) => o.content ?? [])
-    .filter((c: any) => c.type === "output_text")
-    .map((c: any) => c.text)
-    .join("");
-}
-async function structuredGeneration(
-  prompt: string,
-  name: string,
-  schema: object,
-  useWebSearch = true,
-) {
-  const startedAt = Date.now();
-  const res = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${openAiKey.value()}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: openAiModel.value(),
-      ...(useWebSearch ? { tools: [{ type: "web_search" }] } : {}),
-      input: prompt,
-      text: {
-        format: {
-          type: "json_schema",
-          name,
-          strict: true,
-          schema,
-        },
-      },
-    }),
-  });
-  if (!res.ok) throw new Error(`openai_${res.status}`);
-  const json = await res.json();
-  const text = outputText(json);
-  if (!text) throw new Error("empty_model_output");
-  return {
-    data: JSON.parse(text),
-    meta: {
-      responseId: json.id ?? "",
-      durationMs: Date.now() - startedAt,
-      usage: json.usage ?? {},
-      serviceTier: json.service_tier ?? "",
-      webSearchCalls: (json.output ?? []).filter(
-        (item: any) => item.type === "web_search_call",
-      ).length,
-    },
-  };
-}
-async function generateOutline(input: any) {
-  const generated = await structuredGeneration(
-    `日本語の学習用教科書のロードマップと目次だけを作成してください。テーマ: ${input.topic}\n難易度: ${input.level}\n目的: ${input.purpose}\n正確性を優先し、web_searchで信頼できる情報源を調査してください。全4章、各章3ページとし、章とページごとに具体的な要約を付け、各章に本文生成で再利用できる信頼性の高い参照元を3〜6件格納してください。タイトル・要約にはURL、Markdownリンク、ドメイン名や出典の括弧書きを含めないでください。本文、問題、暗記カードはまだ作成しないでください。`,
-    "textbook_outline",
-    textbookOutlineSchema,
-  );
-  const outline = generated.data;
-  return {
-    meta: generated.meta,
-    title: withoutInlineLinks(outline.title),
-    subtitle: containsGenerationMeta(outline.subtitle)
-      ? `${input.topic}を体系的に学ぶ教科書`
-      : withoutInlineLinks(outline.subtitle),
-    category: withoutInlineLinks(outline.category),
-    chapters: outline.chapters.map((chapter: any) => ({
-      title: withoutInlineLinks(chapter.title),
-      summary: withoutInlineLinks(chapter.summary),
-      pages: chapter.pages.map((page: any) => ({
-        title: withoutPageNumberPrefix(withoutInlineLinks(page.title)),
-        summary: withoutInlineLinks(page.summary),
-      })),
-      sources: chapter.sources.map((source: any) => ({
-        title: withoutInlineLinks(source.title),
-        url: String(source.url),
-      })),
-    })),
-  };
-}
-async function generateChapter(input: any, chapter: any, chapterOrder: number) {
-  const hasResearch = Array.isArray(chapter.sources) && chapter.sources.length;
-  return structuredGeneration(
-    `あなたは高品質な教科書を執筆する専門家です。第${chapterOrder}章だけを生成してください。\nテーマ: ${input.topic}\n難易度: ${input.level}\n目的: ${input.purpose}\n承認済み章構成: ${JSON.stringify(chapter)}\n各ページは構成の順番とタイトルを守り、800〜1,200文字を目安に、見出し2〜4個、定義、理由、具体例、背景、因果関係を含めて体系的に説明してください。冗長な水増し、不要な前置き、制作工程のメタ文言は禁止です。章の3ページを横断する選択式または正誤式の確認問題を5問、章の暗記カードを2枚作成してください。本文にURLや出典表記を含めず、参照情報はsourcesだけに格納してください。`,
-    "chapter_content",
-    chapterContentSchema,
-    !hasResearch,
-  );
-}
-async function generateTextbook(input: any, outline: any) {
-  const chapters = [];
-  const flashcards = [];
-  for (const [index, chapter] of outline.chapters.entries()) {
-    const generated = await generateChapter(input, chapter, index + 1);
-    chapters.push(generated.data);
-    flashcards.push(...generated.data.flashcards);
-  }
-  return { chapters, flashcards };
-}
-function block(raw: any) {
-  const id = crypto.randomUUID();
-  switch (raw.type) {
-    case "heading":
-      return {
-        id,
-        type: "heading",
-        level: 2,
-        text: withoutInlineLinks(raw.text || raw.title),
-      };
-    case "callout":
-      return {
-        id,
-        type: "callout",
-        tone: "key",
-        title: withoutInlineLinks(raw.title),
-        text: withoutInlineLinks(raw.text),
-      };
-    case "timeline":
-      return {
-        id,
-        type: "checklist",
-        items: raw.items.map(withoutInlineLinks).filter(Boolean),
-      };
-    case "table":
-      return {
-        id,
-        type: "table",
-        headers: raw.headers.map(withoutInlineLinks),
-        rows: raw.rows.map((row: unknown[]) => row.map(withoutInlineLinks)),
-      };
-    case "checklist":
-      return {
-        id,
-        type: "checklist",
-        items: raw.items.map(withoutInlineLinks).filter(Boolean),
-      };
-    case "code":
-      return { id, type: "code", language: "text", code: raw.text };
-    case "question":
-      return { id, type: "question", prompt: withoutInlineLinks(raw.text) };
-    case "quote":
-      return {
-        id,
-        type: "quote",
-        text: withoutInlineLinks(raw.text),
-        source: withoutInlineLinks(raw.title),
-      };
-    case "formula":
-      return { id, type: "formula", formula: raw.text };
-    case "ai":
-      return {
-        id,
-        type: "ai",
-        title: withoutInlineLinks(raw.title),
-        text: withoutInlineLinks(raw.text),
-      };
-    default:
-      return { id, type: "paragraph", text: withoutInlineLinks(raw.text) };
-  }
-}
-
 async function updateGenerationStage(
   jobRef: FirebaseFirestore.DocumentReference,
   bookRef: FirebaseFirestore.DocumentReference,
@@ -365,8 +206,11 @@ export const processTextbookOutline = onDocumentCreated(
           )
           .catch((error) => console.warn("generation_heartbeat_failed", error));
       }, 15000);
-      const generatedOutline = await generateOutline(job.input);
-      const { meta, ...outline } = generatedOutline;
+      const generatedOutline = await generateOutline(
+        generationConfig(),
+        job.input as TextbookGenerationInput,
+      );
+      const { data: outline, meta } = generatedOutline;
       clearInterval(researchHeartbeat);
       researchHeartbeat = undefined;
       await heartbeatWrite;
@@ -463,9 +307,9 @@ export const approveTextbookOutline = onCall(
       if (generationLock.exists && Date.now() - lockCreatedAt < 15 * 60_000)
         throw new HttpsError("resource-exhausted", "生成中の章があります");
       const bookRef = db.doc(`textbooks/${job.data()!.textbookId}`);
-      const outline = job.data()!.outline;
+      const outline = job.data()!.outline as TextbookOutline;
       const chapterIds = outline.chapters.map(
-        (_chapter: any, index: number) => `chapter-${index + 1}`,
+        (_chapter, index) => `chapter-${index + 1}`,
       );
       for (const [index, chapter] of outline.chapters.entries()) {
         tx.set(bookRef.collection("chapters").doc(chapterIds[index]), {
@@ -668,8 +512,9 @@ export const processTextbookChapter = onDocumentCreated(
         updatedAt: FieldValue.serverTimestamp(),
       });
       const generated = await generateChapter(
-        claimed.input,
-        claimed.outlineChapter,
+        generationConfig(),
+        claimed.input as TextbookGenerationInput,
+        claimed.outlineChapter as OutlineChapter,
         claimed.chapterOrder,
       );
       clearInterval(progressTimer);
@@ -699,60 +544,14 @@ export const processTextbookChapter = onDocumentCreated(
       ]);
       const result = generated.data;
       const batch = db.batch();
-      const pageIds: string[] = [];
-      for (const [index, page] of result.pages.entries()) {
-        const pageRef = bookRef
-          .collection("pages")
-          .doc(`${claimed.chapterId}-page-${index + 1}`);
-        pageIds.push(pageRef.id);
-        batch.set(pageRef, {
-          chapterId: claimed.chapterId,
-          title: claimed.outlineChapter.pages[index].title,
-          order: (claimed.chapterOrder - 1) * 3 + index + 1,
-          readMinutes: page.readMinutes,
-          blocks: page.blocks
-            .filter(
-              (raw: any) =>
-                !containsGenerationMeta(`${raw.title ?? ""} ${raw.text ?? ""}`),
-            )
-            .map(block),
-          sources: page.sources.map((source: any) => ({
-            ...source,
-            accessedAt: new Date().toISOString(),
-          })),
-          createdAt: FieldValue.serverTimestamp(),
-          updatedAt: FieldValue.serverTimestamp(),
-        });
-      }
-      for (const [index, quiz] of result.quizzes.entries()) {
-        batch.set(
-          bookRef
-            .collection("quizzes")
-            .doc(`${claimed.chapterId}-quiz-${index + 1}`),
-          {
-            ...quiz,
-            chapterId: claimed.chapterId,
-            order: index + 1,
-            createdAt: FieldValue.serverTimestamp(),
-            updatedAt: FieldValue.serverTimestamp(),
-          },
-        );
-      }
-      for (const [index, card] of result.flashcards.entries()) {
-        batch.set(
-          bookRef
-            .collection("flashcards")
-            .doc(`${claimed.chapterId}-card-${index + 1}`),
-          {
-            textbookId: bookRef.id,
-            chapterId: claimed.chapterId,
-            ...card,
-            mastery: 0,
-            createdAt: FieldValue.serverTimestamp(),
-            updatedAt: FieldValue.serverTimestamp(),
-          },
-        );
-      }
+      const pageIds = queueChapterContentWrites({
+        batch,
+        bookRef,
+        chapterId: claimed.chapterId,
+        chapterOrder: claimed.chapterOrder,
+        approvedChapter: claimed.outlineChapter as OutlineChapter,
+        result,
+      });
       const count = claimed.chapterOrder;
       const completed = count === 4;
       batch.update(chapterRef, {
@@ -807,164 +606,6 @@ export const processTextbookChapter = onDocumentCreated(
         });
         tx.delete(generationLockRef);
       });
-    }
-  },
-);
-
-export const processTextbookContent = onDocumentUpdated(
-  {
-    document: "generationJobs/{jobId}",
-    timeoutSeconds: 540,
-    memory: "1GiB",
-    secrets: [openAiKey],
-    retry: false,
-  },
-  async (event) => {
-    if (
-      event.data?.before.data()?.status !== "awaiting_approval" ||
-      event.data?.after.data()?.status !== "approved"
-    )
-      return;
-    const jobRef = event.data.after.ref;
-    const claimed = await db.runTransaction(async (tx) => {
-      const current = await tx.get(jobRef);
-      if (current.data()?.status !== "approved") return undefined;
-      tx.update(jobRef, {
-        status: "writing",
-        progress: 44,
-        stageDetail: "承認済みの構成に沿って本文を生成しています",
-        contentStartedAt: FieldValue.serverTimestamp(),
-        updatedAt: FieldValue.serverTimestamp(),
-      });
-      return current.data();
-    });
-    if (!claimed) return;
-    const bookRef = db.doc(`textbooks/${claimed.textbookId}`);
-    let currentStage = "writing";
-    try {
-      await bookRef.update({
-        generationStatus: "writing",
-        updatedAt: FieldValue.serverTimestamp(),
-      });
-      const result = await generateTextbook(claimed.input, claimed.outline);
-      const chapterIds: string[] = [];
-      let firstPageId: string | undefined;
-      const batch = db.batch();
-      for (const [ci, c] of result.chapters.entries()) {
-        const approvedChapter = claimed.outline.chapters[ci];
-        currentStage = "writing";
-        await updateGenerationStage(
-          jobRef,
-          bookRef,
-          "writing",
-          52 + ci * 8,
-          `第${ci + 1}章のページと確認問題を保存しています`,
-        );
-        const chapterRef = bookRef.collection("chapters").doc();
-        chapterIds.push(chapterRef.id);
-        const pageIds: string[] = [];
-        for (const [pi, p] of c.pages.entries()) {
-          const pageRef = bookRef.collection("pages").doc();
-          if (!firstPageId) firstPageId = pageRef.id;
-          pageIds.push(pageRef.id);
-          batch.set(pageRef, {
-            chapterId: chapterRef.id,
-            title: approvedChapter.pages[pi].title,
-            order: ci * 3 + pi + 1,
-            readMinutes: p.readMinutes,
-            blocks: p.blocks
-              .filter(
-                (raw: any) =>
-                  !containsGenerationMeta(
-                    `${raw.title ?? ""} ${raw.text ?? ""}`,
-                  ),
-              )
-              .map(block),
-            sources: p.sources.map((s: any) => ({
-              ...s,
-              accessedAt: new Date().toISOString(),
-            })),
-            createdAt: FieldValue.serverTimestamp(),
-            updatedAt: FieldValue.serverTimestamp(),
-          });
-        }
-        for (const [quizIndex, quiz] of c.quizzes.entries()) {
-          const quizRef = bookRef.collection("quizzes").doc();
-          batch.set(quizRef, {
-            ...quiz,
-            chapterId: chapterRef.id,
-            order: quizIndex + 1,
-            createdAt: FieldValue.serverTimestamp(),
-            updatedAt: FieldValue.serverTimestamp(),
-          });
-        }
-        batch.set(chapterRef, {
-          textbookId: bookRef.id,
-          title: approvedChapter.title,
-          order: ci + 1,
-          pageIds,
-          progress: 0,
-          createdAt: FieldValue.serverTimestamp(),
-          updatedAt: FieldValue.serverTimestamp(),
-        });
-      }
-      currentStage = "finalizing";
-      await updateGenerationStage(
-        jobRef,
-        bookRef,
-        "finalizing",
-        90,
-        "暗記カードと参照元を仕上げています",
-      );
-      for (const card of result.flashcards) {
-        const ref = bookRef.collection("flashcards").doc();
-        batch.set(ref, {
-          textbookId: bookRef.id,
-          ...card,
-          mastery: 0,
-          createdAt: FieldValue.serverTimestamp(),
-          updatedAt: FieldValue.serverTimestamp(),
-        });
-      }
-      await jobRef.update({
-        progress: 96,
-        stageDetail: "すべてのデータを確認して公開準備をしています",
-        updatedAt: FieldValue.serverTimestamp(),
-      });
-      batch.update(bookRef, {
-        title: claimed.outline.title,
-        subtitle: claimed.outline.subtitle,
-        category: claimed.outline.category,
-        chapterIds,
-        firstPageId,
-        generationStatus: "completed",
-        updatedAt: FieldValue.serverTimestamp(),
-      });
-      batch.update(jobRef, {
-        status: "completed",
-        progress: 100,
-        stageDetail: "教科書が完成しました",
-        active: false,
-        firstPageId,
-        updatedAt: FieldValue.serverTimestamp(),
-      });
-      await batch.commit();
-    } catch (error) {
-      console.error("generation_failed", error);
-      await Promise.all([
-        jobRef.update({
-          status: "failed",
-          active: false,
-          errorCode: "GENERATION_FAILED",
-          failedAtStage: currentStage,
-          stageDetail: "生成中に問題が発生しました",
-          updatedAt: FieldValue.serverTimestamp(),
-        }),
-        bookRef.update({
-          generationStatus: "failed",
-          updatedAt: FieldValue.serverTimestamp(),
-        }),
-      ]);
     }
   },
 );

@@ -56,16 +56,6 @@ const page = {
     sources: { type: "array", minItems: 1, maxItems: 6, items: source },
   },
 } as const;
-const chapter = {
-  type: "object",
-  additionalProperties: false,
-  required: ["title", "pages", "quizzes"],
-  properties: {
-    title: { type: "string" },
-    pages: { type: "array", minItems: 3, maxItems: 3, items: page },
-    quizzes: { type: "array", minItems: 5, maxItems: 5, items: quiz },
-  },
-} as const;
 const flashcard = {
   type: "object",
   additionalProperties: false,
@@ -126,17 +116,5 @@ export const textbookOutlineSchema = {
       maxItems: 4,
       items: outlineChapter,
     },
-  },
-} as const;
-export const textbookSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["title", "subtitle", "category", "chapters", "flashcards"],
-  properties: {
-    title: { type: "string" },
-    subtitle: { type: "string" },
-    category: { type: "string" },
-    chapters: { type: "array", minItems: 4, maxItems: 4, items: chapter },
-    flashcards: { type: "array", minItems: 8, items: flashcard },
   },
 } as const;
