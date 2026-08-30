@@ -7,6 +7,7 @@ import {
   runTransaction,
   serverTimestamp,
   setDoc,
+  updateDoc,
   where,
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
@@ -88,20 +89,48 @@ export async function toggleBookmark(
   });
   return true;
 }
-export async function addNote(
+export async function savePageNote(
   uid: string,
   textbookId: string,
   pageId: string,
   text: string,
-  quote = "",
+  noteId?: string,
 ) {
-  const ref = doc(collection(db, `users/${uid}/notes`));
+  const ref = noteId
+    ? doc(db, `users/${uid}/notes/${noteId}`)
+    : doc(db, `users/${uid}/notes/${textbookId}__${pageId}`);
+  if (noteId) {
+    await updateDoc(ref, {
+      text,
+      quote: "",
+      updatedAt: serverTimestamp(),
+    });
+    return;
+  }
   await setDoc(ref, {
     ownerId: uid,
     textbookId,
     pageId,
     text,
-    quote,
+    quote: "",
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+}
+export async function addHighlight(
+  uid: string,
+  textbookId: string,
+  pageId: string,
+  text: string,
+  color = "yellow",
+) {
+  const ref = doc(collection(db, `users/${uid}/highlights`));
+  await setDoc(ref, {
+    ownerId: uid,
+    textbookId,
+    pageId,
+    text,
+    color,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });

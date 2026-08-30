@@ -1,26 +1,51 @@
 import { Bot, Check, Lightbulb, Play, Sparkles } from "lucide-react";
-import type { ContentBlock } from "../types/models";
+import type { ReactNode } from "react";
+import type { ContentBlock, Highlight } from "../types/models";
 import { withoutInlineLinks } from "../utils/text";
-export function ContentRenderer({ block }: { block: ContentBlock }) {
+
+function highlighted(text: string, highlights: Highlight[]): ReactNode {
+  const matches = highlights
+    .map((item) => item.text.trim())
+    .filter((item) => item && text.includes(item))
+    .sort((a, b) => b.length - a.length);
+  if (!matches.length) return text;
+  const pattern = new RegExp(
+    `(${matches.map((item) => item.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`,
+    "g",
+  );
+  return text.split(pattern).map((part, index) =>
+    matches.includes(part) ? (
+      <mark className="saved-highlight" key={`${part}-${index}`}>
+        {part}
+      </mark>
+    ) : (
+      part
+    ),
+  );
+}
+
+export function ContentRenderer({
+  block,
+  highlights = [],
+}: {
+  block: ContentBlock;
+  highlights?: Highlight[];
+}) {
   switch (block.type) {
     case "heading":
       return block.level === 2 ? (
-        <h2>{withoutInlineLinks(block.text)}</h2>
+        <h2>{highlighted(withoutInlineLinks(block.text), highlights)}</h2>
       ) : (
-        <h3>{withoutInlineLinks(block.text)}</h3>
+        <h3>{highlighted(withoutInlineLinks(block.text), highlights)}</h3>
       );
     case "paragraph": {
       const text = withoutInlineLinks(block.text);
-      return text ? (
-        <p contentEditable suppressContentEditableWarning>
-          {text}
-        </p>
-      ) : null;
+      return text ? <p>{highlighted(text, highlights)}</p> : null;
     }
     case "quote":
       return (
         <blockquote>
-          “{withoutInlineLinks(block.text)}”
+          “{highlighted(withoutInlineLinks(block.text), highlights)}”
           {block.source && <cite>— {withoutInlineLinks(block.source)}</cite>}
         </blockquote>
       );
@@ -30,7 +55,7 @@ export function ContentRenderer({ block }: { block: ContentBlock }) {
           <Lightbulb size={19} />
           <div>
             <strong>{withoutInlineLinks(block.title)}</strong>
-            <p>{withoutInlineLinks(block.text)}</p>
+            <p>{highlighted(withoutInlineLinks(block.text), highlights)}</p>
           </div>
         </aside>
       );
@@ -110,7 +135,7 @@ export function ContentRenderer({ block }: { block: ContentBlock }) {
       return (
         <aside className="question-block">
           <strong>考えてみよう</strong>
-          <p>{withoutInlineLinks(block.prompt)}</p>
+          <p>{highlighted(withoutInlineLinks(block.prompt), highlights)}</p>
         </aside>
       );
     case "formula":

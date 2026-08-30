@@ -644,6 +644,7 @@ export const deleteTextbook = onCall(
     const userCollections = [
       "bookmarks",
       "notes",
+      "highlights",
       "quizAttempts",
       "flashcardProgress",
       "conversations",

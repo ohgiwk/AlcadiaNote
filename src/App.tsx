@@ -21,7 +21,6 @@ const HomePage = route(() => import("./pages/HomePage"), "HomePage");
 const CreatePage = route(() => import("./pages/CreatePage"), "CreatePage");
 const LibraryPage = route(() => import("./pages/LibraryPage"), "LibraryPage");
 const ReaderPage = route(() => import("./pages/ReaderPage"), "ReaderPage");
-const NotesPage = route(() => import("./pages/NotesPage"), "NotesPage");
 const QuizPage = route(() => import("./pages/QuizPage"), "QuizPage");
 const FlashcardsPage = route(
   () => import("./pages/FlashcardsPage"),
@@ -89,7 +88,6 @@ function AnimatedRoutes() {
               path="/textbooks/:id/read/:pageId"
               element={<ReaderPage />}
             />
-            <Route path="/textbooks/:id/notes" element={<NotesPage />} />
             <Route
               path="/textbooks/:id/chapters/:chapterId/quiz"
               element={<QuizPage />}

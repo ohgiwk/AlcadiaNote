@@ -150,11 +150,15 @@ export interface Flashcard extends BaseEntity {
   nextReviewAt?: string;
 }
 export interface Note extends BaseEntity {
+  ownerId: ID;
+  textbookId: ID;
   pageId: ID;
   text: string;
   quote?: string;
 }
 export interface Highlight extends BaseEntity {
+  ownerId: ID;
+  textbookId: ID;
   pageId: ID;
   text: string;
   color: string;

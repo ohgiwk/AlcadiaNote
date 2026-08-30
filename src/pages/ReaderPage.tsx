@@ -12,7 +12,7 @@ import {
   Settings2,
   Sparkles,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../auth";
 import { ContentRenderer } from "../components/ContentRenderer";
@@ -20,16 +20,23 @@ import { IconButton, Sheet } from "../components/ui";
 import { AIChatPanel } from "../features/reader/AIChatPanel";
 import { ChapterSidebar } from "../features/reader/ChapterSidebar";
 import { ReaderFooter } from "../features/reader/ReaderFooter";
+import { ReaderNotesPanel } from "../features/reader/ReaderNotesPanel";
 import { TextbookSearch } from "../features/reader/TextbookSearch";
 import { useReadingProgress } from "../features/reader/useReadingProgress";
 import { useCollection, useDocument } from "../hooks/useFirestoreData";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { useTextbook } from "../hooks/useTextbook";
 import {
+  addHighlight,
   requestNextChapterGeneration,
   toggleBookmark,
 } from "../services/firebaseService";
-import type { Bookmark as BookmarkModel, UserProgress } from "../types/models";
+import type {
+  Bookmark as BookmarkModel,
+  Highlight,
+  Note,
+  UserProgress,
+} from "../types/models";
 import {
   containsGenerationMeta,
   withoutInlineLinks,
@@ -57,19 +64,53 @@ export function ReaderPage() {
   const isChapterEnd = currentChapter?.pageIds.at(-1) === pageId;
   const idx = pages.indexOf(page!);
   const [toc, setToc] = useState(false);
-  const [ai, setAi] = useState(false);
-  const [chatOpen, setChatOpen] = useState(true);
+  const [mobilePanel, setMobilePanel] = useState<"ai" | "notes" | null>(null);
+  const [sidePanel, setSidePanel] = useState<"ai" | "notes" | null>("ai");
   const compactReader = useMediaQuery("(max-width: 800px)");
   const [searchOpen, setSearchOpen] = useState(false);
   const [bookmarking, setBookmarking] = useState(false);
   const [bookmarkError, setBookmarkError] = useState("");
   const [chapterError, setChapterError] = useState("");
+  const [highlightError, setHighlightError] = useState("");
+  const [savingHighlight, setSavingHighlight] = useState(false);
+  const [selection, setSelection] = useState<{
+    pageId: string;
+    text: string;
+    x: number;
+    y: number;
+  } | null>(null);
+  const [noteQuote, setNoteQuote] = useState<{
+    pageId: string;
+    text: string;
+  } | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
   const bookmarkedPageIds = new Set(
     bookmarks.filter((x) => x.textbookId === id).map((x) => x.pageId),
   );
   const marked = bookmarkedPageIds.has(pageId);
+  const { data: notes } = useCollection<Note>(`users/${user?.uid}/notes`, {
+    enabled: Boolean(user),
+    filters: user ? [["ownerId", "==", user.uid]] : [],
+  });
+  const { data: highlights } = useCollection<Highlight>(
+    `users/${user?.uid}/highlights`,
+    {
+      enabled: Boolean(user),
+      filters: user ? [["ownerId", "==", user.uid]] : [],
+    },
+  );
+  const pageNotes = notes.filter(
+    (note) => note.textbookId === id && note.pageId === pageId,
+  );
+  const pageNote = [...pageNotes].sort((a, b) =>
+    b.updatedAt.localeCompare(a.updatedAt),
+  )[0];
+  const pageHighlights = highlights.filter(
+    (highlight) =>
+      highlight.textbookId === id && highlight.pageId === pageId,
+  );
+  const clearNoteQuote = useCallback(() => setNoteQuote(null), []);
   useEffect(() => {
     if (!moreOpen) return;
     const close = (event: MouseEvent) => {
@@ -105,6 +146,59 @@ export function ReaderPage() {
       setBookmarking(false);
     }
   }
+  function showPanel(panel: "ai" | "notes") {
+    if (compactReader) {
+      setMobilePanel(panel);
+      return;
+    }
+    setSidePanel((current) => (current === panel ? null : panel));
+  }
+  function captureSelection() {
+    const selected = window.getSelection();
+    const text = selected?.toString().trim() ?? "";
+    if (!selected || selected.rangeCount === 0 || text.length < 2) {
+      setSelection(null);
+      return;
+    }
+    const range = selected.getRangeAt(0);
+    const paper = document.querySelector(".reader-center .paper");
+    if (!paper?.contains(range.commonAncestorContainer)) {
+      setSelection(null);
+      return;
+    }
+    const rect = range.getBoundingClientRect();
+    setSelection({
+      pageId,
+      text: text.slice(0, 2000),
+      x: Math.min(window.innerWidth - 126, Math.max(12, rect.left + rect.width / 2)),
+      y: Math.max(12, rect.top - 52),
+    });
+  }
+  async function saveHighlight() {
+    if (!user || !selection || selection.pageId !== pageId || savingHighlight)
+      return;
+    setSavingHighlight(true);
+    setHighlightError("");
+    try {
+      await addHighlight(user.uid, id, pageId, selection.text);
+      window.getSelection()?.removeAllRanges();
+      setSelection(null);
+    } catch (error) {
+      setHighlightError(
+        error instanceof Error ? error.message : "マーカーを保存できませんでした",
+      );
+    } finally {
+      setSavingHighlight(false);
+    }
+  }
+  function createNoteFromSelection() {
+    if (!selection) return;
+    setNoteQuote({ pageId, text: selection.text });
+    window.getSelection()?.removeAllRanges();
+    setSelection(null);
+    if (compactReader) setMobilePanel("notes");
+    else setSidePanel("notes");
+  }
   const sidebar = (
     <ChapterSidebar
       book={book}
@@ -123,8 +217,19 @@ export function ReaderPage() {
     />
   );
   const chat = <AIChatPanel textbookId={id} pageId={page.id} />;
+  const notebook = (
+    <ReaderNotesPanel
+      key={page.id}
+      uid={user?.uid}
+      textbookId={id}
+      pageId={page.id}
+      note={pageNote}
+      quote={noteQuote?.pageId === pageId ? noteQuote.text : undefined}
+      onQuoteInserted={clearNoteQuote}
+    />
+  );
   return (
-    <div className={`reader ${chatOpen ? "" : "chat-closed"}`}>
+    <div className={`reader ${sidePanel ? "" : "chat-closed"}`}>
       <div className="reader-toc desktop">{sidebar}</div>
       <section className="reader-center">
         <header className="reader-toolbar">
@@ -148,13 +253,13 @@ export function ReaderPage() {
             >
               <Bookmark size={19} fill={marked ? "currentColor" : "none"} />
             </IconButton>
-            <Link
-              className="icon-button"
-              aria-label="ノート"
-              to={`/textbooks/${id}/notes`}
+            <IconButton
+              label="ノート"
+              aria-pressed={!compactReader && sidePanel === "notes"}
+              onClick={() => showPanel("notes")}
             >
               <NotebookPen size={19} />
-            </Link>
+            </IconButton>
             <Link
               className="icon-button"
               aria-label="暗記カード"
@@ -167,14 +272,12 @@ export function ReaderPage() {
               label={
                 compactReader
                   ? "AIチャットを開く"
-                  : chatOpen
+                  : sidePanel === "ai"
                     ? "AIチャットを閉じる"
                     : "AIチャットを開く"
               }
-              aria-pressed={!compactReader && chatOpen}
-              onClick={() =>
-                compactReader ? setAi(true) : setChatOpen((open) => !open)
-              }
+              aria-pressed={!compactReader && sidePanel === "ai"}
+              onClick={() => showPanel("ai")}
             >
               <Sparkles size={19} />
             </IconButton>
@@ -221,7 +324,12 @@ export function ReaderPage() {
             {chapterError}
           </div>
         )}
-        <div className="reader-scroll">
+        {highlightError && (
+          <div className="reader-notice" role="alert">
+            {highlightError}
+          </div>
+        )}
+        <div className="reader-scroll" onMouseUp={captureSelection}>
           <article className="paper">
             <header>
               <span className="chapter-label">{book.category}</span>
@@ -231,7 +339,11 @@ export function ReaderPage() {
               )}
             </header>
             {page.blocks.map((b) => (
-              <ContentRenderer key={b.id} block={b} />
+              <ContentRenderer
+                key={b.id}
+                block={b}
+                highlights={pageHighlights}
+              />
             ))}
             {page.sources?.length ? (
               <section className="page-sources">
@@ -248,11 +360,33 @@ export function ReaderPage() {
               </section>
             ) : null}
           </article>
-          <div className="selection-tools">
-            <Highlighter />
-            <NotebookPen />
-            <Bot />
-          </div>
+          {selection?.pageId === pageId && (
+            <div
+              className="selection-tools"
+              style={{ left: selection.x, top: selection.y }}
+              onMouseDown={(event) => event.preventDefault()}
+            >
+              <button
+                aria-label="選択箇所をマーカーとして保存"
+                disabled={savingHighlight}
+                onClick={() => void saveHighlight()}
+              >
+                <Highlighter size={18} />
+              </button>
+              <button
+                aria-label="選択箇所からノートを作成"
+                onClick={createNoteFromSelection}
+              >
+                <NotebookPen size={18} />
+              </button>
+              <button
+                aria-label="AIチャットを開く"
+                onClick={() => showPanel("ai")}
+              >
+                <Bot size={18} />
+              </button>
+            </div>
+          )}
         </div>
         <ReaderFooter
           textbookId={id}
@@ -263,16 +397,22 @@ export function ReaderPage() {
           onNavigate={nav}
         />
       </section>
-      {chatOpen && <div className="reader-ai desktop">{chat}</div>}
+      {sidePanel && (
+        <div className="reader-ai desktop">
+          <div className="reader-side-panel" key={sidePanel}>
+            {sidePanel === "ai" ? chat : notebook}
+          </div>
+        </div>
+      )}
       <Sheet open={toc} onClose={() => setToc(false)} title="目次">
         {sidebar}
       </Sheet>
       <Sheet
-        open={compactReader && ai}
-        onClose={() => setAi(false)}
-        title="Arcadia AI"
+        open={compactReader && mobilePanel !== null}
+        onClose={() => setMobilePanel(null)}
+        title={mobilePanel === "notes" ? "このページのノート" : "Arcadia AI"}
       >
-        {chat}
+        {mobilePanel === "notes" ? notebook : chat}
       </Sheet>
       <Sheet
         open={searchOpen}

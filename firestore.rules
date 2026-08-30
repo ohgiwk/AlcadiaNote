@@ -42,6 +42,15 @@ service cloud.firestore {
         && data.quote is string && data.quote.size() <= 2000;
     }
 
+    function validHighlight(data, uid) {
+      return validBase(data, uid)
+        && data.keys().hasOnly(['ownerId', 'textbookId', 'pageId', 'text', 'color', 'createdAt', 'updatedAt'])
+        && data.textbookId is string && data.textbookId.size() <= 128
+        && data.pageId is string && data.pageId.size() <= 128
+        && data.text is string && data.text.size() >= 2 && data.text.size() <= 2000
+        && data.color in ['yellow'];
+    }
+
     function validProgress(data, uid) {
       return validBase(data, uid)
         && data.keys().hasOnly(['ownerId', 'textbookId', 'pageId', 'percent', 'createdAt', 'updatedAt'])
@@ -104,6 +113,15 @@ service cloud.firestore {
         allow update: if isOwner(uid)
           && ownsResource()
           && validNote(request.resource.data, uid)
+          && validUpdatedCreatedAt(request.resource.data);
+      }
+
+      match /highlights/{highlightId} {
+        allow read, delete: if isOwner(uid) && ownsResource();
+        allow create: if isOwner(uid) && validHighlight(request.resource.data, uid);
+        allow update: if isOwner(uid)
+          && ownsResource()
+          && validHighlight(request.resource.data, uid)
           && validUpdatedCreatedAt(request.resource.data);
       }
 
