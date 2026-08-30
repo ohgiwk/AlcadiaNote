@@ -11,6 +11,7 @@ export type GenerationStatus =
   | "awaiting_approval"
   | "approved"
   | "writing"
+  | "ready"
   | "finalizing"
   | "completed"
   | "failed";
@@ -26,8 +27,11 @@ export interface TextbookGenerationInput {
   sourceTextbookId?: ID;
 }
 export interface GenerationJob extends BaseEntity {
+  jobType?: "outline" | "chapter";
   ownerId: ID;
   textbookId: ID;
+  chapterId?: ID;
+  chapterOrder?: number;
   status: GenerationStatus;
   progress: number;
   input: TextbookGenerationInput;
@@ -48,6 +52,7 @@ export interface TextbookOutlineChapter {
   title: string;
   summary: string;
   pages: TextbookOutlinePage[];
+  sources?: { title: string; url: string }[];
 }
 export interface TextbookOutline {
   title: string;
@@ -94,6 +99,11 @@ export interface Chapter extends BaseEntity {
   order: number;
   pageIds: ID[];
   progress: number;
+  generationStatus?:
+    "pending" | "queued" | "generating" | "completed" | "failed";
+  generationProgress?: number;
+  elapsedSeconds?: number;
+  errorCode?: string;
 }
 export interface Textbook extends BaseEntity {
   ownerId?: ID;
@@ -111,6 +121,10 @@ export interface Textbook extends BaseEntity {
   purpose?: TextbookGenerationInput["purpose"];
   sourceTextbookId?: ID;
   generationJobId?: ID;
+  generatedChapterCount?: number;
+  nextChapterOrder?: number;
+  activeChapterId?: ID;
+  outline?: TextbookOutline;
 }
 export interface Quiz extends BaseEntity {
   pageId?: ID;
@@ -129,6 +143,7 @@ export interface QuizAttempt extends BaseEntity {
 }
 export interface Flashcard extends BaseEntity {
   textbookId: ID;
+  chapterId?: ID;
   front: string;
   back: string;
   mastery: number;

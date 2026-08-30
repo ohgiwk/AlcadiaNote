@@ -28,10 +28,21 @@ export async function createTextbook(input: TextbookGenerationInput) {
 }
 export async function approveTextbookOutline(jobId: string) {
   return (
-    await httpsCallable<{ jobId: string }, { approved: boolean }>(
+    await httpsCallable<
+      { jobId: string },
+      { approved: boolean; jobId: string }
+    >(
       functions,
       "approveTextbookOutline",
     )({ jobId })
+  ).data;
+}
+export async function requestNextChapterGeneration(textbookId: string) {
+  return (
+    await httpsCallable<{ textbookId: string }, { jobId: string }>(
+      functions,
+      "requestNextChapterGeneration",
+    )({ textbookId })
   ).data;
 }
 export async function askPageQuestion(input: AIConversationRequest) {

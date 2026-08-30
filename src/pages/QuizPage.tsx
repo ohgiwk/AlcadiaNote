@@ -1,18 +1,24 @@
 import { Check, ChevronRight, RotateCcw, Trophy, X } from "lucide-react";
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../auth";
 import { Progress } from "../components/ui";
 import { useTextbook } from "../hooks/useTextbook";
-import { saveQuizAttempt } from "../services/firebaseService";
+import {
+  requestNextChapterGeneration,
+  saveQuizAttempt,
+} from "../services/firebaseService";
 export function QuizPage() {
   const { id = "", chapterId = "" } = useParams();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const { book, chapters, quizzes, loading } = useTextbook(id);
   const [index, setIndex] = useState(0);
   const [selected, setSelected] = useState("");
   const [checked, setChecked] = useState(false);
   const [score, setScore] = useState(0);
+  const [generatingNext, setGeneratingNext] = useState(false);
+  const [generationError, setGenerationError] = useState("");
   const chapter = chapters.find((item) => item.id === chapterId);
   const chapterQuizzes = quizzes
     .filter(
@@ -26,6 +32,22 @@ export function QuizPage() {
   const nextChapter = chapter
     ? chapters.find((item) => item.order === chapter.order + 1)
     : undefined;
+  async function generateNextChapter() {
+    if (!id || !nextChapter) return;
+    setGeneratingNext(true);
+    setGenerationError("");
+    try {
+      await requestNextChapterGeneration(id);
+      navigate(
+        `/textbooks/${id}/read/${chapter?.pageIds.at(-1) ?? book?.firstPageId}`,
+      );
+    } catch (error) {
+      setGenerationError(
+        error instanceof Error ? error.message : "次の章を生成できませんでした",
+      );
+      setGeneratingNext(false);
+    }
+  }
   if (loading) return <div className="page">問題を読み込んでいます…</div>;
   const done = index >= chapterQuizzes.length;
   if (!chapterQuizzes.length)
@@ -54,16 +76,30 @@ export function QuizPage() {
         </strong>
         <Progress value={Math.round((score / chapterQuizzes.length) * 100)} />
         <div>
-          <Link
-            className="button primary"
-            to={
-              nextChapter
-                ? `/textbooks/${id}/read/${nextChapter.pageIds[0]}`
-                : `/textbooks/${id}/flashcards`
-            }
-          >
-            {nextChapter ? "次の章へ進む" : "暗記カードで復習"}
-          </Link>
+          {nextChapter?.pageIds[0] ? (
+            <Link
+              className="button primary"
+              to={`/textbooks/${id}/read/${nextChapter.pageIds[0]}`}
+            >
+              次の章へ進む
+            </Link>
+          ) : nextChapter ? (
+            <button
+              className="button primary"
+              disabled={generatingNext}
+              onClick={generateNextChapter}
+            >
+              {generatingNext
+                ? `第${nextChapter.order}章を生成中…`
+                : nextChapter.generationStatus === "failed"
+                  ? `第${nextChapter.order}章を再試行`
+                  : `第${nextChapter.order}章を生成`}
+            </button>
+          ) : (
+            <Link className="button primary" to={`/textbooks/${id}/flashcards`}>
+              暗記カードで復習
+            </Link>
+          )}
           <button
             className="button"
             onClick={() => {
@@ -77,6 +113,7 @@ export function QuizPage() {
             もう一度
           </button>
         </div>
+        {generationError && <p className="error">{generationError}</p>}
       </div>
     );
   const q = chapterQuizzes[index];

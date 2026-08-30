@@ -7,6 +7,7 @@ import { firebaseConfigured } from "../firebase";
 import {
   approveTextbookOutline,
   createTextbook,
+  requestNextChapterGeneration,
 } from "../services/firebaseService";
 import type { GenerationJob, TextbookGenerationInput } from "../types/models";
 import { withoutInlineLinks } from "../utils/text";
@@ -95,13 +96,26 @@ export function CreatePage() {
     setError("");
     setApproving(true);
     try {
-      await approveTextbookOutline(jobId);
+      const result = await approveTextbookOutline(jobId);
+      setJobId(result.jobId);
+      setSearchParams({ job: result.jobId }, { replace: true });
     } catch (e) {
       setError(
         e instanceof Error ? e.message : "承認を受け付けられませんでした",
       );
     } finally {
       setApproving(false);
+    }
+  }
+  async function retryChapter() {
+    if (!job?.textbookId) return;
+    setError("");
+    try {
+      const result = await requestNextChapterGeneration(job.textbookId);
+      setJobId(result.jobId);
+      setSearchParams({ job: result.jobId }, { replace: true });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "章を再生成できませんでした");
     }
   }
   if (jobId) {
@@ -259,15 +273,19 @@ export function CreatePage() {
           {status === "failed" && (
             <button
               className="button primary"
-              onClick={() => {
-                setJobId("");
-                nav("/create", {
-                  replace: true,
-                  state: job?.input ?? regeneration,
-                });
-              }}
+              onClick={() =>
+                job?.jobType === "chapter"
+                  ? void retryChapter()
+                  : (setJobId(""),
+                    nav("/create", {
+                      replace: true,
+                      state: job?.input ?? regeneration,
+                    }))
+              }
             >
-              条件を確認してもう一度試す
+              {job?.jobType === "chapter"
+                ? `第${job.chapterOrder ?? 1}章を再試行`
+                : "条件を確認してもう一度試す"}
             </button>
           )}
         </section>
@@ -362,7 +380,7 @@ export function CreatePage() {
           <ChevronRight />
         </button>
         <p className="form-note">
-          4章・全12ページを生成します。画面を閉じても処理は続きます。
+          まず目次を作成し、承認後に第1章を生成します。第2章以降は好きなタイミングで追加できます。
         </p>
       </section>
     </div>

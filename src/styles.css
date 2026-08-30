@@ -1130,6 +1130,44 @@ a {
   font-size: 9px;
   color: #939baa;
 }
+.chapter-generation-state {
+  margin: 6px 12px 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: #f3f6fb;
+  color: var(--muted);
+  font-size: 10px;
+}
+.chapter-generation-state.locked {
+  background: transparent;
+}
+.chapter-generate-button {
+  width: calc(100% - 24px);
+  margin: 6px 12px 10px;
+  padding: 10px 12px;
+  border: 1px solid #b9cbea;
+  border-radius: 8px;
+  background: #edf3ff;
+  color: #315d9d;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.chapter-generate-button:hover {
+  background: #e3edff;
+}
+.spin {
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 .chapter-sidebar nav a small {
   display: flex;
   align-items: center;

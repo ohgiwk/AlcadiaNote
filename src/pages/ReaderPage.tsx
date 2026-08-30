@@ -23,7 +23,11 @@ import { ChapterSidebar } from "../features/reader/ChapterSidebar";
 import { TextbookSearch } from "../features/reader/TextbookSearch";
 import { useCollection, useDocument } from "../hooks/useFirestoreData";
 import { useTextbook } from "../hooks/useTextbook";
-import { saveProgress, toggleBookmark } from "../services/firebaseService";
+import {
+  requestNextChapterGeneration,
+  saveProgress,
+  toggleBookmark,
+} from "../services/firebaseService";
 import type { Bookmark as BookmarkModel, UserProgress } from "../types/models";
 import { containsGenerationMeta, withoutInlineLinks } from "../utils/text";
 export function ReaderPage() {
@@ -49,6 +53,7 @@ export function ReaderPage() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [bookmarking, setBookmarking] = useState(false);
   const [bookmarkError, setBookmarkError] = useState("");
+  const [chapterError, setChapterError] = useState("");
   const bookmarkedPageIds = new Set(
     bookmarks.filter((x) => x.textbookId === id).map((x) => x.pageId),
   );
@@ -90,6 +95,14 @@ export function ReaderPage() {
       pages={pages}
       bookmarkedPageIds={bookmarkedPageIds}
       progressPercent={savedProgress?.percent ?? 0}
+      onGenerateChapter={() => {
+        setChapterError("");
+        void requestNextChapterGeneration(id).catch((error) =>
+          setChapterError(
+            error instanceof Error ? error.message : "章を生成できませんでした",
+          ),
+        );
+      }}
     />
   );
   const chat = <AIChatPanel textbookId={id} pageId={page.id} />;
@@ -152,6 +165,11 @@ export function ReaderPage() {
         {bookmarkError && (
           <div className="reader-notice" role="alert">
             {bookmarkError}
+          </div>
+        )}
+        {chapterError && (
+          <div className="reader-notice" role="alert">
+            {chapterError}
           </div>
         )}
         <div className="reader-scroll">

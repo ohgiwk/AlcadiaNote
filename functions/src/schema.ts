@@ -53,7 +53,7 @@ const page = {
     title: { type: "string" },
     readMinutes: { type: "integer" },
     blocks: { type: "array", items: block },
-    sources: { type: "array", items: source },
+    sources: { type: "array", minItems: 1, maxItems: 6, items: source },
   },
 } as const;
 const chapter = {
@@ -84,7 +84,7 @@ const outlinePage = {
 const outlineChapter = {
   type: "object",
   additionalProperties: false,
-  required: ["title", "summary", "pages"],
+  required: ["title", "summary", "pages", "sources"],
   properties: {
     title: { type: "string" },
     summary: { type: "string" },
@@ -93,6 +93,22 @@ const outlineChapter = {
       minItems: 3,
       maxItems: 3,
       items: outlinePage,
+    },
+    sources: { type: "array", minItems: 3, maxItems: 6, items: source },
+  },
+} as const;
+export const chapterContentSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["pages", "quizzes", "flashcards"],
+  properties: {
+    pages: { type: "array", minItems: 3, maxItems: 3, items: page },
+    quizzes: { type: "array", minItems: 5, maxItems: 5, items: quiz },
+    flashcards: {
+      type: "array",
+      minItems: 2,
+      maxItems: 2,
+      items: flashcard,
     },
   },
 } as const;

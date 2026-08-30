@@ -19,7 +19,9 @@ export function HomePage() {
     progressEntries.map((entry) => [entry.textbookId, entry]),
   );
   const ready = books.find(
-    (x) => x.generationStatus === "completed" && x.firstPageId,
+    (x) =>
+      ["ready", "completed"].includes(x.generationStatus ?? "") &&
+      x.firstPageId,
   );
   return (
     <div className="page home">

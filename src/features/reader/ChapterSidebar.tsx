@@ -1,4 +1,12 @@
-import { Bookmark, Check, ChevronDown, Circle, CircleHelp } from "lucide-react";
+import {
+  Bookmark,
+  Check,
+  ChevronDown,
+  Circle,
+  CircleHelp,
+  LoaderCircle,
+  Lock,
+} from "lucide-react";
 import { NavLink } from "react-router-dom";
 import type { Chapter, Page, Textbook } from "../../types/models";
 export function ChapterSidebar({
@@ -7,12 +15,14 @@ export function ChapterSidebar({
   pages,
   bookmarkedPageIds = new Set<string>(),
   progressPercent = 0,
+  onGenerateChapter,
 }: {
   book: Textbook;
   chapters: Chapter[];
   pages: Page[];
   bookmarkedPageIds?: Set<string>;
   progressPercent?: number;
+  onGenerateChapter?: (chapter: Chapter) => void;
 }) {
   const completedPages = Math.round((progressPercent / 100) * pages.length);
   return (
@@ -58,16 +68,38 @@ export function ChapterSidebar({
                 </NavLink>
               ) : null;
             })}
-            <NavLink
-              className="chapter-quiz-link"
-              to={`/textbooks/${book.id}/chapters/${c.id}/quiz`}
-            >
-              <CircleHelp size={14} />
-              <span>
-                章末確認問題
-                <small>5問</small>
-              </span>
-            </NavLink>
+            {c.generationStatus === "completed" || !c.generationStatus ? (
+              <NavLink
+                className="chapter-quiz-link"
+                to={`/textbooks/${book.id}/chapters/${c.id}/quiz`}
+              >
+                <CircleHelp size={14} />
+                <span>
+                  章末確認問題
+                  <small>5問</small>
+                </span>
+              </NavLink>
+            ) : ["queued", "generating"].includes(c.generationStatus) ? (
+              <div className="chapter-generation-state">
+                <LoaderCircle className="spin" size={14} />第{c.order}
+                章を生成中… {c.generationProgress ?? 0}% ·{" "}
+                {c.elapsedSeconds ?? 0}秒
+              </div>
+            ) : c.order === (book.nextChapterOrder ?? 1) ? (
+              <button
+                type="button"
+                className="chapter-generate-button"
+                onClick={() => onGenerateChapter?.(c)}
+              >
+                {c.generationStatus === "failed"
+                  ? `第${c.order}章を再試行`
+                  : `第${c.order}章を生成`}
+              </button>
+            ) : (
+              <div className="chapter-generation-state locked">
+                <Lock size={13} /> 前の章の生成後に利用できます
+              </div>
+            )}
           </section>
         ))}
       </nav>

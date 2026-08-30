@@ -26,7 +26,9 @@ export function BookCover({
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const ready = book.generationStatus === "completed" && book.firstPageId;
+  const ready =
+    ["ready", "completed"].includes(book.generationStatus ?? "") &&
+    book.firstPageId;
   const needsApproval =
     book.generationStatus === "awaiting_approval" && book.generationJobId;
   useEffect(() => {
@@ -60,7 +62,9 @@ export function BookCover({
                 ? "生成に失敗しました"
                 : book.generationStatus === "awaiting_approval"
                   ? "ロードマップを確認してください"
-                  : book.generationStatus !== "completed"
+                  : !["ready", "completed"].includes(
+                        book.generationStatus ?? "",
+                      )
                     ? "生成中…"
                     : book.subtitle}
             </p>
@@ -73,8 +77,8 @@ export function BookCover({
         <div className="book-meta">
           <strong>{book.title}</strong>
           <span>
-            {book.generationStatus === "completed"
-              ? `${book.progress}% 読了`
+            {["ready", "completed"].includes(book.generationStatus ?? "")
+              ? `${book.generatedChapterCount ?? book.chapterIds.length}/4章生成済み · ${book.progress}% 読了`
               : book.generationStatus === "awaiting_approval"
                 ? "構成の確認待ち"
                 : "生成状況を確認中"}
@@ -123,9 +127,12 @@ export function BookCover({
                   className="danger"
                   disabled={
                     deleting ||
-                    !["completed", "failed", "awaiting_approval"].includes(
-                      book.generationStatus ?? "",
-                    )
+                    ![
+                      "ready",
+                      "completed",
+                      "failed",
+                      "awaiting_approval",
+                    ].includes(book.generationStatus ?? "")
                   }
                   onClick={() => {
                     setMenuOpen(false);
