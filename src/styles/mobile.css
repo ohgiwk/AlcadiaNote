@@ -1,0 +1,243 @@
+@media (max-width: 800px) {
+  .drawer-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 15;
+    display: block;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    background: rgba(17, 25, 38, 0.46);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.24s ease;
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+  }
+
+  .drawer-backdrop.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  body {
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+
+  .button,
+  .new-book,
+  .generate-button {
+    min-height: 48px;
+    font-size: 15px;
+  }
+
+  .icon-button,
+  .book-menu-trigger,
+  .round-link {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .eyebrow {
+    font-size: 12px;
+  }
+
+  .welcome p,
+  .title-row p,
+  .create-intro p,
+  .continue-copy p,
+  .recommend p {
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  .stat-card span,
+  .stat-card small,
+  .section-head a,
+  .book-meta > span,
+  .book-conditions span,
+  .filter-pills button {
+    font-size: 13px;
+  }
+
+  .book-meta strong {
+    font-size: 17px;
+  }
+
+  .book-cover small {
+    font-size: 11px;
+  }
+
+  .book-cover p {
+    font-size: 13px;
+    line-height: 1.55;
+  }
+
+  .create-form legend,
+  .topic-label > span {
+    font-size: 15px;
+  }
+
+  .topic-label textarea {
+    font-size: 16px;
+  }
+
+  .topic-label small,
+  .form-note,
+  .form-error {
+    font-size: 13px;
+    line-height: 1.65;
+  }
+
+  .choice-row button {
+    min-height: 46px;
+    height: auto;
+    font-size: 15px;
+  }
+
+  .generation-card > p,
+  .outline-review-header > p {
+    font-size: 15px;
+  }
+
+  .generation-steps strong,
+  .generation-live-status p {
+    font-size: 15px;
+  }
+
+  .generation-steps > div small,
+  .generation-progress-heading span,
+  .generation-live-status small,
+  .generation-conditions span,
+  .generation-background-note,
+  .outline-review-note {
+    font-size: 13px;
+  }
+
+  .outline-chapter p,
+  .outline-chapter li span {
+    font-size: 15px;
+    line-height: 1.7;
+  }
+
+  .outline-chapter li strong {
+    font-size: 16px;
+  }
+
+  .paper .lead {
+    font-size: 16px;
+    line-height: 1.9;
+  }
+
+  .paper > p {
+    font-size: 17px;
+    line-height: 2;
+  }
+
+  .paper h2 {
+    font-size: 24px;
+  }
+
+  .paper h3 {
+    font-size: 20px;
+  }
+
+  .paper blockquote,
+  .callout p,
+  .ai-block p,
+  .question-block p,
+  .checklist li {
+    font-size: 15px;
+  }
+
+  .chapter-label,
+  .paper cite,
+  .diagram figcaption {
+    font-size: 12px;
+  }
+
+  .page-nav button,
+  .reader-more-menu a {
+    font-size: 14px;
+  }
+
+  .page-nav span {
+    font-size: 13px;
+  }
+
+  .message p,
+  .quick-actions button,
+  .chat-input textarea,
+  .textbook-search-results > button small {
+    font-size: 14px;
+  }
+
+  .quiz-page > header,
+  .flash-page > header,
+  .feedback p,
+  .flash-hint,
+  .rating > p,
+  .rating span {
+    font-size: 13px;
+  }
+
+  .answers button,
+  .written-answer {
+    font-size: 16px;
+  }
+
+  .auth-description,
+  .auth-form label,
+  .auth-form input,
+  .auth-tabs button {
+    font-size: 15px;
+  }
+}
+
+@media (min-width: 801px) {
+  .drawer-backdrop {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .book-grid,
+  .library-grid {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+
+  .book-cover p {
+    display: block;
+  }
+
+  .paper {
+    padding: 38px 20px;
+  }
+
+  .paper h1 {
+    font-size: 30px;
+  }
+
+  .page-nav {
+    min-height: 60px;
+  }
+
+  .page-nav button {
+    min-height: 44px;
+  }
+
+  .roadmap article > button {
+    font-size: 14px;
+  }
+}

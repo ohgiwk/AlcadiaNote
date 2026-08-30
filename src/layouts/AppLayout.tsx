@@ -10,7 +10,7 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth";
 import { AuthDialog } from "../components/AuthDialog";
@@ -28,10 +28,18 @@ export function AppLayout() {
   const [palette, setPalette] = useState(false);
   const [account, setAccount] = useState(false);
   const nav = useNavigate();
+  useEffect(() => {
+    if (!menu) return;
+    const close = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMenu(false);
+    };
+    document.addEventListener("keydown", close);
+    return () => document.removeEventListener("keydown", close);
+  }, [menu]);
   return (
     <div className="app-shell">
       <aside className={`main-nav ${menu ? "open" : ""}`}>
-        <Link className="brand" to="/home">
+        <Link className="brand" to="/home" onClick={() => setMenu(false)}>
           <span>
             <BookOpen size={19} />
           </span>
@@ -45,11 +53,17 @@ export function AppLayout() {
             </NavLink>
           ))}
         </nav>
-        <Link className="new-book" to="/create">
+        <Link className="new-book" to="/create" onClick={() => setMenu(false)}>
           <Plus size={18} />
           新しい教科書
         </Link>
-        <button className="profile" onClick={() => setAccount(true)}>
+        <button
+          className="profile"
+          onClick={() => {
+            setMenu(false);
+            setAccount(true);
+          }}
+        >
           <div>{!user ? "!" : user.isAnonymous ? "G" : "✓"}</div>
           <span>
             <strong>
@@ -73,9 +87,21 @@ export function AppLayout() {
           </span>
         </button>
       </aside>
+      <button
+        type="button"
+        className={`drawer-backdrop ${menu ? "open" : ""}`}
+        aria-label="メニューを閉じる"
+        aria-hidden={!menu}
+        tabIndex={menu ? 0 : -1}
+        onClick={() => setMenu(false)}
+      />
       <main className="app-main">
         <header className="topbar">
-          <IconButton label="メニュー" onClick={() => setMenu(!menu)}>
+          <IconButton
+            label="メニュー"
+            aria-expanded={menu}
+            onClick={() => setMenu(!menu)}
+          >
             <Menu />
           </IconButton>
           <button className="global-search" onClick={() => setPalette(true)}>
