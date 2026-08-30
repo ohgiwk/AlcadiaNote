@@ -29,7 +29,11 @@ import {
   toggleBookmark,
 } from "../services/firebaseService";
 import type { Bookmark as BookmarkModel, UserProgress } from "../types/models";
-import { containsGenerationMeta, withoutInlineLinks } from "../utils/text";
+import {
+  containsGenerationMeta,
+  withoutInlineLinks,
+  withoutPageNumberPrefix,
+} from "../utils/text";
 export function ReaderPage() {
   const { id = "", pageId = "" } = useParams();
   const { user } = useAuth();
@@ -176,14 +180,10 @@ export function ReaderPage() {
           <article className="paper">
             <header>
               <span className="chapter-label">{book.category}</span>
-              <h1>{page.title}</h1>
+              <h1>{withoutPageNumberPrefix(page.title)}</h1>
               {!containsGenerationMeta(book.subtitle) && (
                 <p className="lead">{withoutInlineLinks(book.subtitle)}</p>
               )}
-              <div className="read-meta">
-                <span>{page.readMinutes}分で読めます</span>
-                <span>AI生成教科書</span>
-              </div>
             </header>
             {page.blocks.map((b) => (
               <ContentRenderer key={b.id} block={b} />

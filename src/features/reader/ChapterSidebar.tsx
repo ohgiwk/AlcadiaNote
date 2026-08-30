@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import type { Chapter, Page, Textbook } from "../../types/models";
+import { withoutPageNumberPrefix } from "../../utils/text";
 export function ChapterSidebar({
   book,
   chapters,
@@ -52,7 +53,7 @@ export function ChapterSidebar({
                     <Circle size={12} />
                   )}
                   <span>
-                    {p.title}
+                    {withoutPageNumberPrefix(p.title)}
                     <small>
                       {p.readMinutes}分
                       {bookmarkedPageIds.has(p.id) && (

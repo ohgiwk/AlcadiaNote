@@ -7,6 +7,7 @@ import { useCollection } from "../hooks/useFirestoreData";
 import { useTextbook } from "../hooks/useTextbook";
 import { addNote } from "../services/firebaseService";
 import type { Note } from "../types/models";
+import { withoutPageNumberPrefix } from "../utils/text";
 export function NotesPage() {
   const { id = "" } = useParams();
   const { user } = useAuth();
@@ -33,7 +34,7 @@ export function NotesPage() {
         </Link>
         <article className="paper">
           <span className="chapter-label">NOTE MODE</span>
-          <h1>{page.title}</h1>
+          <h1>{withoutPageNumberPrefix(page.title)}</h1>
           <div className="context-menu">
             <button>
               <Highlighter />

@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { containsGenerationMeta, withoutInlineLinks } from "./sanitize.js";
+import {
+  containsGenerationMeta,
+  withoutInlineLinks,
+  withoutPageNumberPrefix,
+} from "./sanitize.js";
 
 test("removes a parenthesized markdown source citation", () => {
   assert.equal(
@@ -44,4 +48,12 @@ test("detects generation-process text that must not appear in pages", () => {
     true,
   );
   assert.equal(containsGenerationMeta("産業革命が社会を変えた背景"), false);
+});
+
+test("removes page number prefixes from generated titles", () => {
+  assert.equal(
+    withoutPageNumberPrefix("ページ1；産業革命の始まり"),
+    "産業革命の始まり",
+  );
+  assert.equal(withoutPageNumberPrefix("ページ２：技術革新"), "技術革新");
 });

@@ -10,7 +10,7 @@ import {
   requestNextChapterGeneration,
 } from "../services/firebaseService";
 import type { GenerationJob, TextbookGenerationInput } from "../types/models";
-import { withoutInlineLinks } from "../utils/text";
+import { withoutInlineLinks, withoutPageNumberPrefix } from "../utils/text";
 const labels: Record<string, string> = {
   queued: "準備しています",
   researching: "信頼できる情報源を調査しています",
@@ -163,7 +163,11 @@ export function CreatePage() {
                   <ol>
                     {chapter.pages.map((page, pageIndex) => (
                       <li key={`${pageIndex}-${page.title}`}>
-                        <strong>{withoutInlineLinks(page.title)}</strong>
+                        <strong>
+                          {withoutPageNumberPrefix(
+                            withoutInlineLinks(page.title),
+                          )}
+                        </strong>
                         <span>{withoutInlineLinks(page.summary)}</span>
                       </li>
                     ))}

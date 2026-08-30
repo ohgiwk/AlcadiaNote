@@ -9,6 +9,15 @@ export function withoutInlineLinks(value: unknown) {
     .trim();
 }
 
+export function withoutPageNumberPrefix(value: unknown) {
+  return String(value ?? "")
+    .replace(
+      /^\s*ページ\s*[0-9０-９一二三四五六七八九十]+\s*[：:；;、.．・\-ー]?\s*/,
+      "",
+    )
+    .trim();
+}
+
 export function containsGenerationMeta(value: unknown) {
   const text = String(value ?? "");
   return (

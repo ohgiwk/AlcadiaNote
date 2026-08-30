@@ -9,7 +9,11 @@ import {
 } from "firebase-functions/v2/firestore";
 import { defineSecret, defineString } from "firebase-functions/params";
 import { chapterContentSchema, textbookOutlineSchema } from "./schema.js";
-import { containsGenerationMeta, withoutInlineLinks } from "./sanitize.js";
+import {
+  containsGenerationMeta,
+  withoutInlineLinks,
+  withoutPageNumberPrefix,
+} from "./sanitize.js";
 
 initializeApp();
 setGlobalOptions({ region: "asia-northeast1", maxInstances: 10 });
@@ -178,7 +182,7 @@ async function generateOutline(input: any) {
       title: withoutInlineLinks(chapter.title),
       summary: withoutInlineLinks(chapter.summary),
       pages: chapter.pages.map((page: any) => ({
-        title: withoutInlineLinks(page.title),
+        title: withoutPageNumberPrefix(withoutInlineLinks(page.title)),
         summary: withoutInlineLinks(page.summary),
       })),
       sources: chapter.sources.map((source: any) => ({

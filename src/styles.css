@@ -1361,12 +1361,6 @@ a {
   font: 500 14px/2 var(--serif);
   color: #616875;
 }
-.read-meta {
-  display: flex;
-  gap: 20px;
-  font-size: 9px;
-  color: #9096a0;
-}
 .paper h2 {
   font: 600 23px/1.5 var(--serif);
   margin: 40px 0 15px;

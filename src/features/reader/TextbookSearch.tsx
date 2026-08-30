@@ -1,7 +1,7 @@
 import { BookOpen, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { ContentBlock, Page } from "../../types/models";
-import { withoutInlineLinks } from "../../utils/text";
+import { withoutInlineLinks, withoutPageNumberPrefix } from "../../utils/text";
 
 function blockText(block: ContentBlock) {
   return Object.entries(block)
@@ -78,7 +78,7 @@ export function TextbookSearch({
               >
                 <BookOpen size={17} />
                 <span>
-                  <strong>{page.title}</strong>
+                  <strong>{withoutPageNumberPrefix(page.title)}</strong>
                   <small>{resultExcerpt(text, normalizedQuery)}</small>
                 </span>
               </button>

@@ -9,6 +9,15 @@ export function withoutInlineLinks(value: string) {
     .trim();
 }
 
+export function withoutPageNumberPrefix(value: string) {
+  return value
+    .replace(
+      /^\s*ページ\s*[0-9０-９一二三四五六七八九十]+\s*[：:；;、.．・\-ー]?\s*/,
+      "",
+    )
+    .trim();
+}
+
 export function containsGenerationMeta(value: string) {
   return (
     /本文[・、]問題[・、]暗記カードは未作成/.test(value) ||
