@@ -6,12 +6,15 @@ export function ChapterSidebar({
   chapters,
   pages,
   bookmarkedPageIds = new Set<string>(),
+  progressPercent = 0,
 }: {
   book: Textbook;
   chapters: Chapter[];
   pages: Page[];
   bookmarkedPageIds?: Set<string>;
+  progressPercent?: number;
 }) {
+  const completedPages = Math.round((progressPercent / 100) * pages.length);
   return (
     <aside className="chapter-sidebar">
       <header>
@@ -33,7 +36,7 @@ export function ChapterSidebar({
               const p = pages.find((x) => x.id === id);
               return p ? (
                 <NavLink to={`/textbooks/${book.id}/read/${p.id}`} key={id}>
-                  {p.id === book.firstPageId ? (
+                  {p.order <= completedPages ? (
                     <Check size={14} />
                   ) : (
                     <Circle size={12} />
@@ -60,11 +63,11 @@ export function ChapterSidebar({
       </nav>
       <footer>
         <div>
-          <strong>{book.progress}%</strong>
+          <strong>{progressPercent}%</strong>
           <span>この教科書の進捗</span>
         </div>
         <div className="progress">
-          <span style={{ width: `${book.progress}%` }} />
+          <span style={{ width: `${progressPercent}%` }} />
         </div>
       </footer>
     </aside>

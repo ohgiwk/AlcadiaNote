@@ -4,6 +4,7 @@ import {
   doc,
   getDocs,
   query,
+  runTransaction,
   serverTimestamp,
   setDoc,
   where,
@@ -100,18 +101,27 @@ export async function saveProgress(
   pageId: string,
   percent: number,
 ) {
-  await setDoc(
-    doc(db, `users/${uid}/progress/${textbookId}`),
-    {
+  const progressRef = doc(db, `users/${uid}/progress/${textbookId}`);
+  await runTransaction(db, async (transaction) => {
+    const current = await transaction.get(progressRef);
+    if (current.exists() && Number(current.data().percent ?? 0) >= percent)
+      return;
+    const data = {
       ownerId: uid,
       textbookId,
       pageId,
       percent,
       updatedAt: serverTimestamp(),
-      createdAt: serverTimestamp(),
-    },
-    { merge: true },
-  );
+    };
+    if (current.exists()) {
+      transaction.update(progressRef, data);
+    } else {
+      transaction.set(progressRef, {
+        ...data,
+        createdAt: serverTimestamp(),
+      });
+    }
+  });
 }
 export async function saveQuizAttempt(
   uid: string,

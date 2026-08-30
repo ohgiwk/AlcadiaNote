@@ -4,12 +4,19 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../auth";
 import { BookCover } from "../components/BookCover";
 import { useCollection } from "../hooks/useFirestoreData";
-import type { Textbook } from "../types/models";
+import type { Textbook, UserProgress } from "../types/models";
 export function HomePage() {
   const { user } = useAuth();
   const { data: books } = useCollection<Textbook>(
     "textbooks",
     user ? [where("ownerId", "==", user.uid)] : [],
+  );
+  const { data: progressEntries } = useCollection<UserProgress>(
+    user ? `users/${user.uid}/progress` : "__none__",
+    user ? [where("ownerId", "==", user.uid)] : [],
+  );
+  const progressByTextbook = new Map(
+    progressEntries.map((entry) => [entry.textbookId, entry]),
   );
   const ready = books.find(
     (x) => x.generationStatus === "completed" && x.firstPageId,
@@ -36,7 +43,7 @@ export function HomePage() {
             <p>{ready.subtitle}</p>
           </div>
           <Link
-            to={`/textbooks/${ready.id}/read/${ready.firstPageId}`}
+            to={`/textbooks/${ready.id}/read/${progressByTextbook.get(ready.id)?.pageId ?? ready.firstPageId}`}
             className="round-link"
           >
             <ArrowRight />
@@ -55,7 +62,13 @@ export function HomePage() {
       {books.length ? (
         <div className="book-grid">
           {books.slice(0, 3).map((x) => (
-            <BookCover key={x.id} book={x} />
+            <BookCover
+              key={x.id}
+              book={{
+                ...x,
+                progress: progressByTextbook.get(x.id)?.percent ?? 0,
+              }}
+            />
           ))}
         </div>
       ) : (

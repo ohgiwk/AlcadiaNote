@@ -21,10 +21,10 @@ import { IconButton, Sheet } from "../components/ui";
 import { AIChatPanel } from "../features/reader/AIChatPanel";
 import { ChapterSidebar } from "../features/reader/ChapterSidebar";
 import { TextbookSearch } from "../features/reader/TextbookSearch";
-import { useCollection } from "../hooks/useFirestoreData";
+import { useCollection, useDocument } from "../hooks/useFirestoreData";
 import { useTextbook } from "../hooks/useTextbook";
 import { saveProgress, toggleBookmark } from "../services/firebaseService";
-import type { Bookmark as BookmarkModel } from "../types/models";
+import type { Bookmark as BookmarkModel, UserProgress } from "../types/models";
 import { containsGenerationMeta, withoutInlineLinks } from "../utils/text";
 export function ReaderPage() {
   const { id = "", pageId = "" } = useParams();
@@ -35,6 +35,9 @@ export function ReaderPage() {
     user ? `users/${user.uid}/bookmarks` : "__none__",
     user ? [where("ownerId", "==", user.uid)] : [],
   ).data;
+  const { data: savedProgress } = useDocument<UserProgress>(
+    user ? `users/${user.uid}/progress/${id}` : undefined,
+  );
   const page = pages.find((x) => x.id === pageId);
   const idx = pages.indexOf(page!);
   const [toc, setToc] = useState(false);
@@ -82,6 +85,7 @@ export function ReaderPage() {
       chapters={chapters}
       pages={pages}
       bookmarkedPageIds={bookmarkedPageIds}
+      progressPercent={savedProgress?.percent ?? 0}
     />
   );
   const chat = <AIChatPanel textbookId={id} pageId={page.id} />;

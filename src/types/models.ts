@@ -150,8 +150,8 @@ export interface UserProgress extends BaseEntity {
   textbookId: ID;
   pageId: ID;
   percent: number;
-  studyMinutes: number;
-  streak: number;
+  studyMinutes?: number;
+  streak?: number;
 }
 export interface KnowledgeNode {
   id: ID;

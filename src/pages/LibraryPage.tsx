@@ -6,7 +6,11 @@ import { useAuth } from "../auth";
 import { BookCover } from "../components/BookCover";
 import { useCollection } from "../hooks/useFirestoreData";
 import { deleteTextbook } from "../services/firebaseService";
-import type { Textbook, TextbookGenerationInput } from "../types/models";
+import type {
+  Textbook,
+  TextbookGenerationInput,
+  UserProgress,
+} from "../types/models";
 export function LibraryPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -21,6 +25,13 @@ export function LibraryPage() {
   } = useCollection<Textbook>(
     "textbooks",
     user ? [where("ownerId", "==", user.uid)] : [],
+  );
+  const { data: progressEntries } = useCollection<UserProgress>(
+    user ? `users/${user.uid}/progress` : "__none__",
+    user ? [where("ownerId", "==", user.uid)] : [],
+  );
+  const progressByTextbook = new Map(
+    progressEntries.map((entry) => [entry.textbookId, entry.percent]),
   );
   const categories = ["すべて", ...new Set(textbooks.map((x) => x.category))];
   const list = useMemo(
@@ -97,7 +108,10 @@ export function LibraryPage() {
           {list.map((x) => (
             <BookCover
               key={x.id}
-              book={x}
+              book={{
+                ...x,
+                progress: progressByTextbook.get(x.id) ?? 0,
+              }}
               showGenerationConditions
               deleting={deletingId === x.id}
               onRegenerate={() =>
