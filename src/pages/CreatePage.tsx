@@ -11,9 +11,15 @@ import { useDocument } from "../hooks/useFirestoreData";
 import {
   approveTextbookOutline,
   createTextbook,
+  restorePreviousTextbookOutline,
+  reviseTextbookOutline,
   requestNextChapterGeneration,
 } from "../services/firebaseService";
-import type { GenerationJob, TextbookGenerationInput } from "../types/models";
+import type {
+  GenerationJob,
+  OutlineRevisionInput,
+  TextbookGenerationInput,
+} from "../types/models";
 
 export function CreatePage() {
   const location = useLocation();
@@ -31,6 +37,7 @@ export function CreatePage() {
   const [clock, setClock] = useState(0);
   const [error, setError] = useState("");
   const [approving, setApproving] = useState(false);
+  const [revising, setRevising] = useState(false);
   const navigate = useNavigate();
   const { data: job, loading: jobLoading } = useDocument<GenerationJob>(
     jobId ? `generationJobs/${jobId}` : undefined,
@@ -103,6 +110,40 @@ export function CreatePage() {
     }
   }
 
+  async function reviseOutline(input: Omit<OutlineRevisionInput, "jobId">) {
+    setError("");
+    setRevising(true);
+    try {
+      const result = await reviseTextbookOutline({ jobId, ...input });
+      setJobId(result.jobId);
+      setSearchParams({ job: result.jobId }, { replace: true });
+      setRevising(false);
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "ロードマップを調整できませんでした",
+      );
+      setRevising(false);
+    }
+  }
+
+  async function restoreOutline() {
+    setError("");
+    setRevising(true);
+    try {
+      await restorePreviousTextbookOutline(jobId);
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "ロードマップを復元できませんでした",
+      );
+    } finally {
+      setRevising(false);
+    }
+  }
+
   if (!jobId) {
     return (
       <GenerationForm
@@ -121,6 +162,7 @@ export function CreatePage() {
   if (job?.status === "awaiting_approval" && job.outline) {
     return (
       <OutlineReview
+        key={job.id}
         job={
           job as GenerationJob & {
             outline: NonNullable<GenerationJob["outline"]>;
@@ -128,7 +170,10 @@ export function CreatePage() {
         }
         error={error}
         approving={approving}
+        revising={revising}
         onApprove={() => void approveOutline()}
+        onRevise={(revision) => void reviseOutline(revision)}
+        onRestore={() => void restoreOutline()}
         onLater={() => navigate("/library")}
       />
     );

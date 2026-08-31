@@ -1,6 +1,16 @@
-import { BookOpen, Check, ChevronRight, Clock3, Sparkles } from "lucide-react";
+import {
+  BookOpen,
+  Check,
+  ChevronRight,
+  Clock3,
+  RotateCcw,
+  Sparkles,
+} from "lucide-react";
+import { useState } from "react";
 import type {
   GenerationJob,
+  OutlineQuickAction,
+  OutlineRevisionInput,
   TextbookGenerationInput,
 } from "../../types/models";
 import { withoutInlineLinks, withoutPageNumberPrefix } from "../../utils/text";
@@ -14,6 +24,7 @@ const labels: Record<string, string> = {
   writing: "章とページを書いています",
   finalizing: "問題とカードを仕上げています",
   completed: "完成しました",
+  superseded: "調整後のロードマップへ切り替えています",
   failed: "生成に失敗しました",
 };
 
@@ -32,19 +43,102 @@ function formatElapsed(seconds: number) {
     : `${rest}秒`;
 }
 
+const quickLabels: { value: OutlineQuickAction; label: string }[] = [
+  { value: "detailed", label: "詳しく" },
+  { value: "simple", label: "簡単に" },
+  { value: "practical", label: "実践的に" },
+];
+
+function ChapterAdjustment({
+  chapterIndex,
+  revising,
+  approving,
+  onRevise,
+}: {
+  chapterIndex: number;
+  revising: boolean;
+  approving: boolean;
+  onRevise: (revision: Omit<OutlineRevisionInput, "jobId">) => void;
+}) {
+  const [instruction, setInstruction] = useState("");
+  const [quickAction, setQuickAction] = useState<OutlineQuickAction>();
+  const canRevise = Boolean(instruction.trim() || quickAction);
+  return (
+    <div className="outline-chapter-adjustment">
+      <h3>第{chapterIndex + 1}章を調整</h3>
+      <textarea
+        value={instruction}
+        maxLength={1000}
+        disabled={revising || approving}
+        onChange={(event) => setInstruction(event.target.value)}
+        placeholder="この章で増やしたい内容や変更したい順序を入力"
+      />
+      <div
+        className="outline-quick-actions"
+        aria-label={`第${chapterIndex + 1}章の詳細度`}
+      >
+        <span>詳細度・方向性</span>
+        {quickLabels.map((action) => (
+          <button
+            type="button"
+            className={quickAction === action.value ? "selected" : ""}
+            key={action.value}
+            onClick={() => setQuickAction(action.value)}
+          >
+            {action.label}
+          </button>
+        ))}
+      </div>
+      <button
+        type="button"
+        className="button primary outline-revise-button"
+        disabled={!canRevise || revising || approving}
+        onClick={() => {
+          onRevise({
+            instruction: instruction.trim(),
+            scope: "chapter",
+            chapterIndex,
+            ...(quickAction ? { quickAction } : {}),
+          });
+        }}
+      >
+        {revising ? "再生成を開始しています…" : "この章を再生成"}
+        <Sparkles size={17} />
+      </button>
+    </div>
+  );
+}
+
 export function OutlineReview({
   job,
   error,
   approving,
+  revising,
   onApprove,
+  onRevise,
+  onRestore,
   onLater,
 }: {
   job: GenerationJob & { outline: NonNullable<GenerationJob["outline"]> };
   error: string;
   approving: boolean;
+  revising: boolean;
   onApprove: () => void;
+  onRevise: (revision: Omit<OutlineRevisionInput, "jobId">) => void;
+  onRestore: () => void;
   onLater: () => void;
 }) {
+  const [instruction, setInstruction] = useState("");
+  const [quickAction, setQuickAction] = useState<OutlineQuickAction>();
+  const [level, setLevel] = useState(job.input.level);
+  const [purpose, setPurpose] = useState(job.input.purpose);
+  const [openChapterIndex, setOpenChapterIndex] = useState<number>();
+  const canRevise = Boolean(
+    instruction.trim() ||
+    quickAction ||
+    level !== job.input.level ||
+    purpose !== job.input.purpose,
+  );
   return (
     <div className="page outline-review" aria-live="polite">
       <header className="outline-review-header">
@@ -54,7 +148,14 @@ export function OutlineReview({
         <div className="generation-conditions">
           <span>難易度：{job.input.level}</span>
           <span>目的：{job.input.purpose}</span>
-          <span>全4章・12ページ</span>
+          <span>
+            全{job.outline.chapters.length}章・
+            {job.outline.chapters.reduce(
+              (sum, chapter) => sum + chapter.pages.length,
+              0,
+            )}
+            ページ
+          </span>
         </div>
       </header>
       <section className="outline-review-list">
@@ -77,11 +178,126 @@ export function OutlineReview({
                   </li>
                 ))}
               </ol>
+              <button
+                type="button"
+                className="outline-open-adjustment"
+                aria-expanded={openChapterIndex === chapterIndex}
+                onClick={() =>
+                  setOpenChapterIndex((current) =>
+                    current === chapterIndex ? undefined : chapterIndex,
+                  )
+                }
+              >
+                {openChapterIndex === chapterIndex
+                  ? "調整を閉じる"
+                  : "この章を調整"}
+              </button>
+              {openChapterIndex === chapterIndex && (
+                <ChapterAdjustment
+                  chapterIndex={chapterIndex}
+                  revising={revising}
+                  approving={approving}
+                  onRevise={onRevise}
+                />
+              )}
             </div>
           </article>
         ))}
       </section>
-      {error && <p className="error">{error}</p>}
+      <section className="outline-adjustment">
+        <div className="outline-adjustment-heading">
+          <div>
+            <span className="eyebrow">ADJUST ROADMAP</span>
+            <h2>ロードマップ全体を調整</h2>
+          </div>
+          {job.previousOutline && (
+            <button
+              type="button"
+              className="button secondary"
+              disabled={revising || approving}
+              onClick={onRestore}
+            >
+              <RotateCcw size={16} /> 1つ前に戻す
+            </button>
+          )}
+        </div>
+        <div className="outline-condition-editor">
+          <fieldset>
+            <legend>難易度</legend>
+            <div>
+              {(["初心者", "中級", "上級", "AIに任せる"] as const).map(
+                (value) => (
+                  <button
+                    type="button"
+                    className={level === value ? "selected" : ""}
+                    key={value}
+                    onClick={() => setLevel(value)}
+                  >
+                    {value}
+                  </button>
+                ),
+              )}
+            </div>
+          </fieldset>
+          <fieldset>
+            <legend>目的</legend>
+            <div>
+              {(["趣味", "仕事", "資格", "教養"] as const).map((value) => (
+                <button
+                  type="button"
+                  className={purpose === value ? "selected" : ""}
+                  key={value}
+                  onClick={() => setPurpose(value)}
+                >
+                  {value}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+        </div>
+        <textarea
+          value={instruction}
+          maxLength={1000}
+          disabled={revising || approving}
+          onChange={(event) => setInstruction(event.target.value)}
+          placeholder="全体の構成で変更したい内容を入力"
+        />
+        <div className="outline-quick-actions" aria-label="全体の詳細度">
+          <span>詳細度・方向性</span>
+          {quickLabels.map((action) => (
+            <button
+              type="button"
+              className={quickAction === action.value ? "selected" : ""}
+              key={action.value}
+              onClick={() => setQuickAction(action.value)}
+            >
+              {action.label}
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          className="button primary outline-revise-button"
+          disabled={!canRevise || revising || approving}
+          onClick={() =>
+            onRevise({
+              instruction: instruction.trim(),
+              scope: "all",
+              ...(quickAction ? { quickAction } : {}),
+              level,
+              purpose,
+            })
+          }
+        >
+          {revising ? "再生成を開始しています…" : "全体を再生成"}
+          <Sparkles size={17} />
+        </button>
+      </section>
+      {(error || job.errorCode === "OUTLINE_REVISION_FAILED") && (
+        <p className="error">
+          {error || "調整に失敗したため、直前のロードマップを表示しています。"}
+        </p>
+      )}
       <div className="outline-review-actions">
         <button type="button" className="button secondary" onClick={onLater}>
           あとで確認する
@@ -89,7 +305,7 @@ export function OutlineReview({
         <button
           type="button"
           className="button primary"
-          disabled={approving}
+          disabled={approving || revising}
           onClick={onApprove}
         >
           {approving ? "承認中…" : "この構成で本文を生成"}

@@ -9,6 +9,7 @@ import { generateChapter, generateOutline } from "./generation.js";
 import { outputText } from "./openai.js";
 import type {
   OutlineChapter,
+  OutlineRevision,
   TextbookGenerationInput,
   TextbookOutline,
 } from "./types.js";
@@ -209,6 +210,12 @@ export const processTextbookOutline = onDocumentCreated(
       const generatedOutline = await generateOutline(
         generationConfig(),
         job.input as TextbookGenerationInput,
+        job.revision
+          ? {
+              ...(job.revision as OutlineRevision),
+              currentOutline: job.previousOutline as TextbookOutline,
+            }
+          : undefined,
       );
       const { data: outline, meta } = generatedOutline;
       clearInterval(researchHeartbeat);
@@ -231,7 +238,7 @@ export const processTextbookOutline = onDocumentCreated(
         bookRef,
         "outlining",
         30,
-        "4章・12ページの構成を確認しています",
+        "ロードマップの構成を確認しています",
       );
       const batch = db.batch();
       batch.update(jobRef, {
@@ -259,22 +266,289 @@ export const processTextbookOutline = onDocumentCreated(
       console.error("outline_generation_failed", error);
       await db.runTransaction(async (tx) => {
         const currentLock = await tx.get(generationLockRef);
-        tx.update(jobRef, {
-          status: "failed",
-          active: false,
-          errorCode: "OUTLINE_GENERATION_FAILED",
-          failedAtStage: currentStage,
-          stageDetail: "ロードマップの生成中に問題が発生しました",
-          updatedAt: FieldValue.serverTimestamp(),
-        });
+        const fallbackOutline = job.previousOutline as
+          TextbookOutline | undefined;
+        const fallbackInput = job.previousInput as
+          TextbookGenerationInput | undefined;
+        tx.update(
+          jobRef,
+          fallbackOutline
+            ? {
+                status: "awaiting_approval",
+                active: false,
+                outline: fallbackOutline,
+                ...(fallbackInput ? { input: fallbackInput } : {}),
+                errorCode: "OUTLINE_REVISION_FAILED",
+                failedAtStage: currentStage,
+                stageDetail:
+                  "調整に失敗したため、直前のロードマップを表示しています",
+                updatedAt: FieldValue.serverTimestamp(),
+              }
+            : {
+                status: "failed",
+                active: false,
+                errorCode: "OUTLINE_GENERATION_FAILED",
+                failedAtStage: currentStage,
+                stageDetail: "ロードマップの生成中に問題が発生しました",
+                updatedAt: FieldValue.serverTimestamp(),
+              },
+        );
         if (currentLock.data()?.jobId !== jobRef.id) return;
         tx.update(bookRef, {
-          generationStatus: "failed",
+          generationStatus: fallbackOutline ? "awaiting_approval" : "failed",
+          ...(fallbackOutline
+            ? {
+                title: fallbackOutline.title,
+                subtitle: fallbackOutline.subtitle,
+                category: fallbackOutline.category,
+                ...(fallbackInput
+                  ? {
+                      level: fallbackInput.level,
+                      purpose: fallbackInput.purpose,
+                    }
+                  : {}),
+              }
+            : {}),
           updatedAt: FieldValue.serverTimestamp(),
         });
         tx.delete(generationLockRef);
       });
     }
+  },
+);
+
+export const reviseTextbookOutline = onCall(
+  { enforceAppCheck: false },
+  async (request) => {
+    if (!request.auth)
+      throw new HttpsError("unauthenticated", "ログインが必要です");
+    const jobId = String(request.data?.jobId ?? "");
+    const instruction = String(request.data?.instruction ?? "").trim();
+    const scope = String(request.data?.scope ?? "");
+    const quickAction = request.data?.quickAction
+      ? String(request.data.quickAction)
+      : undefined;
+    const chapterIndex =
+      request.data?.chapterIndex === undefined
+        ? undefined
+        : Number(request.data.chapterIndex);
+    const chapterCount =
+      request.data?.chapterCount === undefined
+        ? undefined
+        : Number(request.data.chapterCount);
+    const pageCounts: number[] | undefined = Array.isArray(
+      request.data?.pageCounts,
+    )
+      ? request.data.pageCounts.map(Number)
+      : undefined;
+    const level = request.data?.level ? String(request.data.level) : undefined;
+    const purpose = request.data?.purpose
+      ? String(request.data.purpose)
+      : undefined;
+    if (!/^[A-Za-z0-9_-]{1,128}$/.test(jobId))
+      throw new HttpsError("invalid-argument", "生成ジョブIDが不正です");
+    if (instruction.length > 1000 || !["all", "chapter"].includes(scope))
+      throw new HttpsError("invalid-argument", "調整内容を確認してください");
+    if (
+      (chapterCount === undefined) !== (pageCounts === undefined) ||
+      (chapterCount !== undefined &&
+        (!Number.isInteger(chapterCount) ||
+          chapterCount < 2 ||
+          chapterCount > 8 ||
+          pageCounts!.length !== chapterCount ||
+          pageCounts!.some(
+            (count) => !Number.isInteger(count) || count < 1 || count > 8,
+          )))
+    )
+      throw new HttpsError(
+        "invalid-argument",
+        "章数またはページ数が範囲外です",
+      );
+    if (
+      quickAction &&
+      !["detailed", "simple", "practical"].includes(quickAction)
+    )
+      throw new HttpsError("invalid-argument", "調整方法が不正です");
+    if (
+      (level && !allowedLevels.includes(level)) ||
+      (purpose && !allowedPurposes.includes(purpose))
+    )
+      throw new HttpsError("invalid-argument", "生成条件が不正です");
+
+    const sourceJobRef = db.doc(`generationJobs/${jobId}`);
+    const nextJobRef = db.collection("generationJobs").doc();
+    const lockRef = db.doc(`generationLocks/${request.auth.uid}`);
+    await db.runTransaction(async (tx) => {
+      const [sourceJob, lock] = await Promise.all([
+        tx.get(sourceJobRef),
+        tx.get(lockRef),
+      ]);
+      const data = sourceJob.data();
+      if (!sourceJob.exists || data?.ownerId !== request.auth!.uid)
+        throw new HttpsError("permission-denied", "調整する権限がありません");
+      if (data?.status !== "awaiting_approval" || !data.outline)
+        throw new HttpsError(
+          "failed-precondition",
+          "このロードマップは調整できません",
+        );
+      const currentOutline = data.outline as TextbookOutline;
+      const nextLevel = level ?? data.input.level;
+      const nextPurpose = purpose ?? data.input.purpose;
+      if (
+        scope === "chapter" &&
+        (!Number.isInteger(chapterIndex) ||
+          chapterIndex! < 0 ||
+          chapterIndex! >= currentOutline.chapters.length ||
+          (chapterCount !== undefined &&
+            chapterCount !== currentOutline.chapters.length))
+      )
+        throw new HttpsError("invalid-argument", "対象の章が不正です");
+      if (
+        scope === "chapter" &&
+        (nextLevel !== data.input.level || nextPurpose !== data.input.purpose)
+      )
+        throw new HttpsError(
+          "invalid-argument",
+          "難易度と目的は全体調整で変更してください",
+        );
+      const currentPageCounts = currentOutline.chapters.map(
+        (chapter) => chapter.pages.length,
+      );
+      if (
+        scope === "chapter" &&
+        pageCounts?.some(
+          (count, index) =>
+            index !== chapterIndex && count !== currentPageCounts[index],
+        )
+      )
+        throw new HttpsError(
+          "invalid-argument",
+          "対象外の章のページ数は変更できません",
+        );
+      const hasDimensionChange =
+        (chapterCount !== undefined &&
+          chapterCount !== currentOutline.chapters.length) ||
+        Boolean(
+          pageCounts?.some(
+            (count, index) => count !== currentPageCounts[index],
+          ),
+        );
+      const hasConditionChange =
+        nextLevel !== data.input.level || nextPurpose !== data.input.purpose;
+      if (
+        !instruction &&
+        !quickAction &&
+        !hasDimensionChange &&
+        !hasConditionChange
+      )
+        throw new HttpsError("invalid-argument", "調整内容を入力してください");
+      const lockCreatedAt = lock.data()?.createdAt?.toMillis?.() ?? 0;
+      if (lock.exists && Date.now() - lockCreatedAt < 15 * 60_000)
+        throw new HttpsError("resource-exhausted", "別の生成処理が進行中です");
+      const bookRef = db.doc(`textbooks/${data.textbookId}`);
+      const now = FieldValue.serverTimestamp();
+      const revision: OutlineRevision = {
+        instruction,
+        scope: scope as OutlineRevision["scope"],
+        ...(chapterIndex === undefined ? {} : { chapterIndex }),
+        ...(quickAction
+          ? { quickAction: quickAction as OutlineRevision["quickAction"] }
+          : {}),
+        ...(chapterCount === undefined ? {} : { chapterCount }),
+        ...(pageCounts === undefined ? {} : { pageCounts }),
+        ...(level ? { level: level as OutlineRevision["level"] } : {}),
+        ...(purpose ? { purpose: purpose as OutlineRevision["purpose"] } : {}),
+      };
+      const nextInput = {
+        ...data.input,
+        level: nextLevel,
+        purpose: nextPurpose,
+      };
+      tx.update(sourceJobRef, {
+        status: "superseded",
+        active: false,
+        stageDetail: "調整後のロードマップへ引き継ぎました",
+        updatedAt: now,
+      });
+      tx.set(nextJobRef, {
+        jobType: "outline",
+        ownerId: request.auth!.uid,
+        textbookId: data.textbookId,
+        input: nextInput,
+        revision,
+        previousOutline: currentOutline,
+        previousInput: data.input,
+        previousJobId: sourceJobRef.id,
+        status: "queued",
+        progress: 0,
+        active: true,
+        stageDetail: "ロードマップの調整を受け付けました",
+        createdAt: now,
+        updatedAt: now,
+      });
+      tx.update(bookRef, {
+        generationStatus: "queued",
+        generationJobId: nextJobRef.id,
+        level: nextLevel,
+        purpose: nextPurpose,
+        updatedAt: now,
+      });
+      tx.set(lockRef, {
+        jobId: nextJobRef.id,
+        textbookId: data.textbookId,
+        jobType: "outline",
+        createdAt: now,
+      });
+    });
+    return { jobId: nextJobRef.id };
+  },
+);
+
+export const restorePreviousTextbookOutline = onCall(
+  { enforceAppCheck: false },
+  async (request) => {
+    if (!request.auth)
+      throw new HttpsError("unauthenticated", "ログインが必要です");
+    const jobId = String(request.data?.jobId ?? "");
+    if (!/^[A-Za-z0-9_-]{1,128}$/.test(jobId))
+      throw new HttpsError("invalid-argument", "生成ジョブIDが不正です");
+    const jobRef = db.doc(`generationJobs/${jobId}`);
+    await db.runTransaction(async (tx) => {
+      const job = await tx.get(jobRef);
+      const data = job.data();
+      if (!job.exists || data?.ownerId !== request.auth!.uid)
+        throw new HttpsError("permission-denied", "復元する権限がありません");
+      if (data?.status !== "awaiting_approval" || !data.previousOutline)
+        throw new HttpsError(
+          "failed-precondition",
+          "復元できるロードマップがありません",
+        );
+      const outline = data.previousOutline as TextbookOutline;
+      const previousInput = data.previousInput as
+        TextbookGenerationInput | undefined;
+      const bookRef = db.doc(`textbooks/${data.textbookId}`);
+      tx.update(jobRef, {
+        outline,
+        previousOutline: FieldValue.delete(),
+        previousInput: FieldValue.delete(),
+        previousJobId: FieldValue.delete(),
+        ...(previousInput ? { input: previousInput } : {}),
+        errorCode: FieldValue.delete(),
+        stageDetail: "直前のロードマップへ戻しました",
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      tx.update(bookRef, {
+        title: outline.title,
+        subtitle: outline.subtitle,
+        category: outline.category,
+        ...(previousInput
+          ? { level: previousInput.level, purpose: previousInput.purpose }
+          : {}),
+        generationStatus: "awaiting_approval",
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    });
+    return { restored: true, jobId };
   },
 );
 
@@ -393,7 +667,8 @@ export const requestNextChapterGeneration = onCall(
       if (hasActiveLock)
         throw new HttpsError("resource-exhausted", "生成中の章があります");
       const order = Number(book.data()?.nextChapterOrder ?? 1);
-      if (order > 4)
+      const totalChapters = Number(book.data()?.outline?.chapters?.length ?? 0);
+      if (order > totalChapters)
         throw new HttpsError(
           "failed-precondition",
           "すべての章が完成しています",
@@ -553,7 +828,9 @@ export const processTextbookChapter = onDocumentCreated(
         result,
       });
       const count = claimed.chapterOrder;
-      const completed = count === 4;
+      const book = await bookRef.get();
+      const completed =
+        count === Number(book.data()?.outline?.chapters?.length ?? 0);
       batch.update(chapterRef, {
         pageIds,
         generationStatus: "completed",

@@ -78,7 +78,7 @@ export function BookCover({
           <strong>{book.title}</strong>
           <span>
             {["ready", "completed"].includes(book.generationStatus ?? "")
-              ? `${book.generatedChapterCount ?? book.chapterIds.length}/4章生成済み · ${book.progress}% 読了`
+              ? `${book.generatedChapterCount ?? book.chapterIds.length}/${book.outline?.chapters.length ?? book.chapterIds.length}章生成済み · ${book.progress}% 読了`
               : book.generationStatus === "awaiting_approval"
                 ? "構成の確認待ち"
                 : "生成状況を確認中"}

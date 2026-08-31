@@ -87,34 +87,103 @@ const outlineChapter = {
     sources: { type: "array", minItems: 3, maxItems: 6, items: source },
   },
 } as const;
-export const chapterContentSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["pages", "quizzes", "flashcards"],
-  properties: {
-    pages: { type: "array", minItems: 3, maxItems: 3, items: page },
-    quizzes: { type: "array", minItems: 5, maxItems: 5, items: quiz },
-    flashcards: {
-      type: "array",
-      minItems: 2,
-      maxItems: 2,
-      items: flashcard,
+export function buildChapterContentSchema(pageCount = 3) {
+  return {
+    type: "object",
+    additionalProperties: false,
+    required: ["pages", "quizzes", "flashcards"],
+    properties: {
+      pages: {
+        type: "array",
+        minItems: pageCount,
+        maxItems: pageCount,
+        items: page,
+      },
+      quizzes: { type: "array", minItems: 5, maxItems: 5, items: quiz },
+      flashcards: {
+        type: "array",
+        minItems: 2,
+        maxItems: 2,
+        items: flashcard,
+      },
     },
-  },
-} as const;
-export const textbookOutlineSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["title", "subtitle", "category", "chapters"],
-  properties: {
-    title: { type: "string" },
-    subtitle: { type: "string" },
-    category: { type: "string" },
-    chapters: {
-      type: "array",
-      minItems: 4,
-      maxItems: 4,
-      items: outlineChapter,
+  } as const;
+}
+export function buildTextbookOutlineSchema(
+  chapterCount = 4,
+  pageCounts = Array(chapterCount).fill(3),
+) {
+  return {
+    type: "object",
+    additionalProperties: false,
+    required: ["title", "subtitle", "category", "chapters"],
+    properties: {
+      title: { type: "string" },
+      subtitle: { type: "string" },
+      category: { type: "string" },
+      chapters: {
+        type: "array",
+        minItems: chapterCount,
+        maxItems: chapterCount,
+        items: {
+          ...outlineChapter,
+          properties: {
+            ...outlineChapter.properties,
+            pages: {
+              ...outlineChapter.properties.pages,
+              minItems: Math.min(...pageCounts),
+              maxItems: Math.max(...pageCounts),
+            },
+          },
+        },
+      },
     },
-  },
-} as const;
+  } as const;
+}
+
+export function buildAdaptiveTextbookOutlineSchema() {
+  return {
+    type: "object",
+    additionalProperties: false,
+    required: ["title", "subtitle", "category", "chapters"],
+    properties: {
+      title: { type: "string" },
+      subtitle: { type: "string" },
+      category: { type: "string" },
+      chapters: {
+        type: "array",
+        minItems: 2,
+        maxItems: 8,
+        items: {
+          ...outlineChapter,
+          properties: {
+            ...outlineChapter.properties,
+            pages: {
+              ...outlineChapter.properties.pages,
+              minItems: 1,
+              maxItems: 8,
+            },
+          },
+        },
+      },
+    },
+  } as const;
+}
+
+export function buildChapterRevisionOutlineSchema(chapterCount: number) {
+  const schema = buildAdaptiveTextbookOutlineSchema();
+  return {
+    ...schema,
+    properties: {
+      ...schema.properties,
+      chapters: {
+        ...schema.properties.chapters,
+        minItems: chapterCount,
+        maxItems: chapterCount,
+      },
+    },
+  } as const;
+}
+
+export const chapterContentSchema = buildChapterContentSchema();
+export const textbookOutlineSchema = buildTextbookOutlineSchema();

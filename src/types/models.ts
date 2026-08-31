@@ -14,7 +14,20 @@ export type GenerationStatus =
   | "ready"
   | "finalizing"
   | "completed"
+  | "superseded"
   | "failed";
+export type OutlineQuickAction = "detailed" | "simple" | "practical";
+export interface OutlineRevisionInput {
+  jobId: ID;
+  instruction: string;
+  scope: "all" | "chapter";
+  chapterIndex?: number;
+  quickAction?: OutlineQuickAction;
+  chapterCount?: number;
+  pageCounts?: number[];
+  level?: TextbookGenerationInput["level"];
+  purpose?: TextbookGenerationInput["purpose"];
+}
 export interface Source {
   title: string;
   url: string;
@@ -43,6 +56,10 @@ export interface GenerationJob extends BaseEntity {
   firstPageId?: ID;
   outline?: TextbookOutline;
   approvedAt?: string;
+  previousOutline?: TextbookOutline;
+  previousInput?: TextbookGenerationInput;
+  previousJobId?: ID;
+  revision?: Omit<OutlineRevisionInput, "jobId">;
 }
 export interface TextbookOutlinePage {
   title: string;

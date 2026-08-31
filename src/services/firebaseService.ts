@@ -14,6 +14,7 @@ import { httpsCallable } from "firebase/functions";
 import { db, functions } from "../firebase";
 import type {
   AIConversationRequest,
+  OutlineRevisionInput,
   TextbookGenerationInput,
 } from "../types/models";
 export async function createTextbook(input: TextbookGenerationInput) {
@@ -35,6 +36,25 @@ export async function approveTextbookOutline(jobId: string) {
     >(
       functions,
       "approveTextbookOutline",
+    )({ jobId })
+  ).data;
+}
+export async function reviseTextbookOutline(input: OutlineRevisionInput) {
+  return (
+    await httpsCallable<OutlineRevisionInput, { jobId: string }>(
+      functions,
+      "reviseTextbookOutline",
+    )(input)
+  ).data;
+}
+export async function restorePreviousTextbookOutline(jobId: string) {
+  return (
+    await httpsCallable<
+      { jobId: string },
+      { restored: boolean; jobId: string }
+    >(
+      functions,
+      "restorePreviousTextbookOutline",
     )({ jobId })
   ).data;
 }

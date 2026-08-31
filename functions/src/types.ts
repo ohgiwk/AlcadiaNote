@@ -8,6 +8,19 @@ export interface TextbookGenerationInput {
   sourceTextbookId?: string;
 }
 
+export type OutlineQuickAction = "detailed" | "simple" | "practical";
+
+export interface OutlineRevision {
+  instruction: string;
+  scope: "all" | "chapter";
+  chapterIndex?: number;
+  quickAction?: OutlineQuickAction;
+  chapterCount?: number;
+  pageCounts?: number[];
+  level?: LearningLevel;
+  purpose?: LearningPurpose;
+}
+
 export interface OutlineSource {
   title: string;
   url: string;
