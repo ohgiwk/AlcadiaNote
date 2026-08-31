@@ -118,6 +118,7 @@ export function OutlineReview({
   onRevise,
   onRestore,
   onLater,
+  showApprovalActions = true,
 }: {
   job: GenerationJob & { outline: NonNullable<GenerationJob["outline"]> };
   error: string;
@@ -127,6 +128,7 @@ export function OutlineReview({
   onRevise: (revision: Omit<OutlineRevisionInput, "jobId">) => void;
   onRestore: () => void;
   onLater: () => void;
+  showApprovalActions?: boolean;
 }) {
   const [instruction, setInstruction] = useState("");
   const [quickAction, setQuickAction] = useState<OutlineQuickAction>();
@@ -298,23 +300,31 @@ export function OutlineReview({
           {error || "調整に失敗したため、直前のロードマップを表示しています。"}
         </p>
       )}
-      <div className="outline-review-actions">
-        <button type="button" className="button secondary" onClick={onLater}>
-          あとで確認する
-        </button>
-        <button
-          type="button"
-          className="button primary"
-          disabled={approving || revising}
-          onClick={onApprove}
-        >
-          {approving ? "承認中…" : "この構成で本文を生成"}
-          {!approving && <ChevronRight size={18} />}
-        </button>
-      </div>
-      <p className="outline-review-note">
-        承認するまで本文生成は開始されません。目次は本棚から再度確認できます。
-      </p>
+      {showApprovalActions && (
+        <>
+          <div className="outline-review-actions">
+            <button
+              type="button"
+              className="button secondary"
+              onClick={onLater}
+            >
+              あとで確認する
+            </button>
+            <button
+              type="button"
+              className="button primary"
+              disabled={approving || revising}
+              onClick={onApprove}
+            >
+              {approving ? "承認中…" : "この構成で本文を生成"}
+              {!approving && <ChevronRight size={18} />}
+            </button>
+          </div>
+          <p className="outline-review-note">
+            承認するまで本文生成は開始されません。目次は本棚から再度確認できます。
+          </p>
+        </>
+      )}
     </div>
   );
 }

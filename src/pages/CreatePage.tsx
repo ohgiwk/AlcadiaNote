@@ -11,6 +11,7 @@ import { useDocument } from "../hooks/useFirestoreData";
 import {
   approveTextbookOutline,
   createTextbook,
+  createTextbookFromRoadmap,
   restorePreviousTextbookOutline,
   reviseTextbookOutline,
   requestNextChapterGeneration,
@@ -18,6 +19,7 @@ import {
 import type {
   GenerationJob,
   OutlineRevisionInput,
+  Textbook,
   TextbookGenerationInput,
 } from "../types/models";
 
@@ -42,6 +44,12 @@ export function CreatePage() {
   const { data: job, loading: jobLoading } = useDocument<GenerationJob>(
     jobId ? `generationJobs/${jobId}` : undefined,
   );
+  const { data: sourceBook, loading: sourceBookLoading } =
+    useDocument<Textbook>(
+      !jobId && regeneration?.sourceTextbookId
+        ? `textbooks/${regeneration.sourceTextbookId}`
+        : undefined,
+    );
 
   useEffect(() => {
     if (!jobId) return;
@@ -144,7 +152,61 @@ export function CreatePage() {
     }
   }
 
+  async function startRoadmapRegeneration(
+    revision: Omit<OutlineRevisionInput, "jobId">,
+  ) {
+    if (!regeneration?.sourceTextbookId) return;
+    setError("");
+    setRevising(true);
+    try {
+      const result = await createTextbookFromRoadmap({
+        ...revision,
+        sourceTextbookId: regeneration.sourceTextbookId,
+        level: revision.level ?? input.level,
+        purpose: revision.purpose ?? input.purpose,
+      });
+      setJobId(result.jobId);
+      setSearchParams({ job: result.jobId }, { replace: true });
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "ロードマップの再生成を開始できませんでした",
+      );
+    } finally {
+      setRevising(false);
+    }
+  }
+
   if (!jobId) {
+    if (regeneration?.sourceTextbookId && sourceBookLoading)
+      return <div className="page">ロードマップを読み込んでいます…</div>;
+    if (regeneration?.sourceTextbookId && sourceBook?.outline) {
+      const previewJob = {
+        id: `source-${sourceBook.id}`,
+        ownerId: sourceBook.ownerId ?? "",
+        textbookId: sourceBook.id,
+        status: "awaiting_approval" as const,
+        progress: 100,
+        input,
+        outline: sourceBook.outline,
+        createdAt: sourceBook.createdAt,
+        updatedAt: sourceBook.updatedAt,
+      };
+      return (
+        <OutlineReview
+          job={previewJob}
+          error={error}
+          approving={false}
+          revising={revising}
+          onApprove={() => undefined}
+          onRevise={(revision) => void startRoadmapRegeneration(revision)}
+          onRestore={() => undefined}
+          onLater={() => navigate("/library")}
+          showApprovalActions={false}
+        />
+      );
+    }
     return (
       <GenerationForm
         input={input}

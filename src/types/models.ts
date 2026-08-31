@@ -28,6 +28,14 @@ export interface OutlineRevisionInput {
   level?: TextbookGenerationInput["level"];
   purpose?: TextbookGenerationInput["purpose"];
 }
+export interface TextbookRoadmapRegenerationInput extends Omit<
+  OutlineRevisionInput,
+  "jobId"
+> {
+  sourceTextbookId: ID;
+  level: TextbookGenerationInput["level"];
+  purpose: TextbookGenerationInput["purpose"];
+}
 export interface Source {
   title: string;
   url: string;

@@ -49,6 +49,10 @@ export const createTextbook = onCall(
     const level = String(request.data?.level ?? "");
     const purpose = String(request.data?.purpose ?? "");
     const sourceTextbookId = String(request.data?.sourceTextbookId ?? "");
+    const revisionData = request.data?.revision as
+      Record<string, unknown> | undefined;
+    let sourceOutline: TextbookOutline | undefined;
+    let sourceInput: TextbookGenerationInput | undefined;
     if (
       topic.length < 2 ||
       topic.length > 300 ||
@@ -73,6 +77,61 @@ export const createTextbook = onCall(
       topic = String(
         source.data()?.topic || source.data()?.title || topic,
       ).trim();
+      sourceOutline = source.data()?.outline as TextbookOutline | undefined;
+      sourceInput = {
+        topic,
+        level: String(
+          source.data()?.level ?? level,
+        ) as TextbookGenerationInput["level"],
+        purpose: String(
+          source.data()?.purpose ?? purpose,
+        ) as TextbookGenerationInput["purpose"],
+        sourceTextbookId,
+      };
+    }
+    let revision: OutlineRevision | undefined;
+    if (revisionData) {
+      if (!sourceOutline || !sourceInput)
+        throw new HttpsError(
+          "failed-precondition",
+          "再生成元のロードマップがありません",
+        );
+      const instruction = String(revisionData.instruction ?? "").trim();
+      const scope = String(revisionData.scope ?? "");
+      const quickAction = revisionData.quickAction
+        ? String(revisionData.quickAction)
+        : undefined;
+      const chapterIndex =
+        revisionData.chapterIndex === undefined
+          ? undefined
+          : Number(revisionData.chapterIndex);
+      if (
+        instruction.length > 1000 ||
+        !["all", "chapter"].includes(scope) ||
+        (quickAction &&
+          !["detailed", "simple", "practical"].includes(quickAction)) ||
+        (scope === "chapter" &&
+          (!Number.isInteger(chapterIndex) ||
+            chapterIndex! < 0 ||
+            chapterIndex! >= sourceOutline.chapters.length)) ||
+        (scope === "chapter" &&
+          (level !== sourceInput.level || purpose !== sourceInput.purpose)) ||
+        (!instruction &&
+          !quickAction &&
+          level === sourceInput.level &&
+          purpose === sourceInput.purpose)
+      )
+        throw new HttpsError("invalid-argument", "調整内容を確認してください");
+      revision = {
+        instruction,
+        scope: scope as OutlineRevision["scope"],
+        ...(chapterIndex === undefined ? {} : { chapterIndex }),
+        ...(quickAction
+          ? { quickAction: quickAction as OutlineRevision["quickAction"] }
+          : {}),
+        level: level as OutlineRevision["level"],
+        purpose: purpose as OutlineRevision["purpose"],
+      };
     }
     const book = db.collection("textbooks").doc();
     const job = db.collection("generationJobs").doc();
@@ -90,7 +149,7 @@ export const createTextbook = onCall(
         level,
         purpose,
         ...(sourceTextbookId ? { sourceTextbookId } : {}),
-        title: topic,
+        title: sourceOutline?.title ?? topic,
         subtitle: "生成中…",
         category: "AI教科書",
         cover,
@@ -113,6 +172,13 @@ export const createTextbook = onCall(
           purpose,
           ...(sourceTextbookId ? { sourceTextbookId } : {}),
         },
+        ...(revision && sourceOutline && sourceInput
+          ? {
+              revision,
+              previousOutline: sourceOutline,
+              previousInput: sourceInput,
+            }
+          : {}),
         status: "queued",
         progress: 0,
         stageDetail: "生成ジョブを受け付けました",

@@ -15,6 +15,7 @@ import { db, functions } from "../firebase";
 import type {
   AIConversationRequest,
   OutlineRevisionInput,
+  TextbookRoadmapRegenerationInput,
   TextbookGenerationInput,
 } from "../types/models";
 export async function createTextbook(input: TextbookGenerationInput) {
@@ -26,6 +27,28 @@ export async function createTextbook(input: TextbookGenerationInput) {
       functions,
       "createTextbook",
     )(input)
+  ).data;
+}
+export async function createTextbookFromRoadmap(
+  input: TextbookRoadmapRegenerationInput,
+) {
+  const { sourceTextbookId, level, purpose, ...revision } = input;
+  return (
+    await httpsCallable<
+      TextbookGenerationInput & {
+        revision: Omit<OutlineRevisionInput, "jobId">;
+      },
+      { jobId: string; textbookId: string }
+    >(
+      functions,
+      "createTextbook",
+    )({
+      topic: "regeneration",
+      sourceTextbookId,
+      level,
+      purpose,
+      revision: { ...revision, level, purpose },
+    })
   ).data;
 }
 export async function approveTextbookOutline(jobId: string) {
