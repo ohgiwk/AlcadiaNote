@@ -452,6 +452,8 @@
   font-size: 12px;
 }
 .reader-toolbar {
+  position: relative;
+  z-index: 20;
   background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(15px);
   border-bottom: 1px solid var(--line);
