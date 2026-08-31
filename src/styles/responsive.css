@@ -105,6 +105,20 @@
   .reader-ai.desktop {
     display: none;
   }
+  .reader-mobile-side-toolbar {
+    position: fixed;
+    z-index: 18;
+    right: 12px;
+    bottom: 68px;
+    display: flex;
+    padding: 4px;
+    gap: 2px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.94);
+    box-shadow: 0 8px 24px rgba(37, 48, 65, 0.14);
+    backdrop-filter: blur(12px);
+  }
   .reader-scroll {
     padding: 18px;
   }

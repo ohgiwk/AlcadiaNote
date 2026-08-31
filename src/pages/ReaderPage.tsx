@@ -159,7 +159,7 @@ export function ReaderPage() {
       setMobilePanel(panel);
       return;
     }
-    setSidePanel((current) => (current === panel ? null : panel));
+    setSidePanel(panel);
   }
   function toggleToc() {
     if (compactToc) {
@@ -289,13 +289,6 @@ export function ReaderPage() {
             >
               <Bookmark size={19} fill={marked ? "currentColor" : "none"} />
             </IconButton>
-            <IconButton
-              label="ノート"
-              aria-pressed={!compactReader && sidePanel === "notes"}
-              onClick={() => showPanel("notes")}
-            >
-              <NotebookPen size={19} />
-            </IconButton>
             <Link
               className="icon-button"
               aria-label="ロードマップ"
@@ -313,19 +306,6 @@ export function ReaderPage() {
             >
               <GalleryVerticalEnd size={19} />
             </Link>
-            <IconButton
-              label={
-                compactReader
-                  ? "AIチャットを開く"
-                  : sidePanel === "ai"
-                    ? "AIチャットを閉じる"
-                    : "AIチャットを開く"
-              }
-              aria-pressed={!compactReader && sidePanel === "ai"}
-              onClick={() => showPanel("ai")}
-            >
-              <Sparkles size={19} />
-            </IconButton>
             <IconButton label="表示設定">
               <Settings2 size={19} />
             </IconButton>
@@ -359,6 +339,28 @@ export function ReaderPage() {
             </div>
           </div>
         </header>
+        <div className="reader-mobile-side-toolbar" role="toolbar" aria-label="右ペイン">
+          <IconButton label="ノートを開く" onClick={() => showPanel("notes")}>
+            <NotebookPen size={19} />
+          </IconButton>
+          <IconButton label="AIチャットを開く" onClick={() => showPanel("ai")}>
+            <Sparkles size={19} />
+          </IconButton>
+        </div>
+        {!sidePanel && (
+          <div
+            className="reader-side-panel-launcher desktop"
+            role="toolbar"
+            aria-label="右ペインを開く"
+          >
+            <IconButton label="ノートを開く" onClick={() => showPanel("notes")}>
+              <NotebookPen size={19} />
+            </IconButton>
+            <IconButton label="AIチャットを開く" onClick={() => showPanel("ai")}>
+              <Sparkles size={19} />
+            </IconButton>
+          </div>
+        )}
         {bookmarkError && (
           <div className="reader-notice" role="alert">
             {bookmarkError}
@@ -448,13 +450,34 @@ export function ReaderPage() {
           onNavigate={nav}
         />
       </section>
-      {sidePanel && (
-        <div className="reader-ai desktop">
-          <div className="reader-side-panel" key={sidePanel}>
-            {sidePanel === "ai" ? chat : notebook}
-          </div>
+      {sidePanel && <div className="reader-ai desktop">
+        <div className="reader-side-toolbar" role="toolbar" aria-label="右ペイン">
+          <button
+            type="button"
+            className={sidePanel === "notes" ? "active" : undefined}
+            aria-pressed={sidePanel === "notes"}
+            onClick={() => showPanel("notes")}
+          >
+            <NotebookPen size={17} />
+            <span>ノート</span>
+          </button>
+          <button
+            type="button"
+            className={sidePanel === "ai" ? "active" : undefined}
+            aria-pressed={sidePanel === "ai"}
+            onClick={() => showPanel("ai")}
+          >
+            <Sparkles size={17} />
+            <span>AIチャット</span>
+          </button>
+          <IconButton label="右ペインを閉じる" onClick={() => setSidePanel(null)}>
+            <X size={18} />
+          </IconButton>
         </div>
-      )}
+        <div className="reader-side-panel" key={sidePanel}>
+          {sidePanel === "ai" ? chat : notebook}
+        </div>
+      </div>}
       <div
         className={`reader-toc-drawer-layer ${compactReader && toc ? "open" : ""}`}
         aria-hidden={!compactReader || !toc}
