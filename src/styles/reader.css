@@ -100,7 +100,7 @@
   background: transparent;
   color: var(--ink);
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   text-align: left;
   cursor: pointer;
@@ -113,6 +113,22 @@
   font-size: 12px;
   font-weight: 700;
 }
+.chapter-sidebar section h3 small {
+  margin-left: 6px;
+  padding: 3px 5px;
+  border-radius: 5px;
+  font-size: 8px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.chapter-sidebar section h3 small.generated {
+  background: #e8f4ed;
+  color: #37795b;
+}
+.chapter-sidebar section h3 small.preview {
+  background: #f0f2f5;
+  color: #7f8998;
+}
 .chapter-sidebar section h3 button span {
   grid-column: 1/-1;
   font-size: 8px;
@@ -120,10 +136,10 @@
   color: #9098a5;
   margin-bottom: 4px;
 }
-.chapter-sidebar section h3 svg {
+.chapter-sidebar section h3 .chapter-chevron {
   transition: transform 0.2s ease;
 }
-.chapter-sidebar section.collapsed h3 svg {
+.chapter-sidebar section.collapsed h3 .chapter-chevron {
   transform: rotate(-90deg);
 }
 .chapter-toc-content {
@@ -173,6 +189,31 @@
 .chapter-sidebar nav a small {
   font-size: 9px;
   color: #939baa;
+}
+.chapter-page-preview {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin: 2px 0;
+  padding: 10px;
+  border-radius: 9px;
+  color: #9199a6;
+  background: rgba(242, 244, 247, 0.72);
+}
+.chapter-page-preview > svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: #9da5b1;
+}
+.chapter-page-preview > span {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+.chapter-page-preview strong {
+  color: #626d7c;
+  font-size: 10px;
+  line-height: 1.5;
 }
 .chapter-generation-state {
   margin: 6px 12px 10px;

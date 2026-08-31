@@ -4,6 +4,7 @@ import {
   ChevronDown,
   Circle,
   CircleHelp,
+  FileClock,
   Home,
   LoaderCircle,
   Lock,
@@ -11,7 +12,7 @@ import {
 import { useState } from "react";
 import { Link, NavLink } from "react-router-dom";
 import type { Chapter, Page, Textbook } from "../../types/models";
-import { withoutPageNumberPrefix } from "../../utils/text";
+import { withoutInlineLinks, withoutPageNumberPrefix } from "../../utils/text";
 export function ChapterSidebar({
   book,
   chapters,
@@ -31,7 +32,16 @@ export function ChapterSidebar({
 }) {
   const completedPages = Math.round((progressPercent / 100) * pages.length);
   const [collapsedChapters, setCollapsedChapters] = useState<Set<string>>(
-    () => new Set(),
+    () =>
+      new Set(
+        chapters
+          .filter(
+            (chapter) =>
+              chapter.generationStatus !== "completed" &&
+              chapter.order !== (book.nextChapterOrder ?? 1),
+          )
+          .map((chapter) => chapter.id),
+      ),
   );
   function toggleChapter(chapterId: string) {
     setCollapsedChapters((current) => {
@@ -51,93 +61,121 @@ export function ChapterSidebar({
         <span className="eyebrow">CONTENTS</span>
         <strong>{book.title}</strong>
         <small>
-          全{chapters.length}章 · {pages.length}ページ
+          全{book.outline?.chapters.length ?? chapters.length}章 ·{" "}
+          {book.outline?.chapters.reduce(
+            (total, chapter) => total + chapter.pages.length,
+            0,
+          ) ?? pages.length}
+          ページ
         </small>
       </header>
       <nav>
         {chapters.map((c) => {
           const collapsed = collapsedChapters.has(c.id);
+          const outlineChapter = book.outline?.chapters[c.order - 1];
+          const generated =
+            c.generationStatus === "completed" || !c.generationStatus;
           return (
-          <section className={collapsed ? "collapsed" : ""} key={c.id}>
-            <h3>
-              <button
-                type="button"
-                aria-expanded={!collapsed}
-                onClick={() => toggleChapter(c.id)}
-              >
-                <span>第{c.order}章</span>
-                <strong>{c.title}</strong>
-                <ChevronDown size={15} />
-              </button>
-            </h3>
-            <div className="chapter-toc-content">
-              <div>
-            {c.pageIds.map((id) => {
-              const p = pages.find((x) => x.id === id);
-              return p ? (
-                <NavLink
-                  to={`/textbooks/${book.id}/read/${p.id}`}
-                  key={id}
-                  onClick={onNavigate}
+            <section className={collapsed ? "collapsed" : ""} key={c.id}>
+              <h3>
+                <button
+                  type="button"
+                  aria-expanded={!collapsed}
+                  onClick={() => toggleChapter(c.id)}
                 >
-                  {p.order <= completedPages ? (
-                    <Check size={14} />
+                  <span>第{c.order}章</span>
+                  <strong>{c.title}</strong>
+                  <small className={generated ? "generated" : "preview"}>
+                    {generated ? "生成済み" : "生成前"}
+                  </small>
+                  <ChevronDown className="chapter-chevron" size={15} />
+                </button>
+              </h3>
+              <div className="chapter-toc-content">
+                <div>
+                  {c.pageIds.map((id) => {
+                    const p = pages.find((x) => x.id === id);
+                    return p ? (
+                      <NavLink
+                        to={`/textbooks/${book.id}/read/${p.id}`}
+                        key={id}
+                        onClick={onNavigate}
+                      >
+                        {p.order <= completedPages ? (
+                          <Check size={14} />
+                        ) : (
+                          <Circle size={12} />
+                        )}
+                        <span>
+                          {withoutPageNumberPrefix(p.title)}
+                          {bookmarkedPageIds.has(p.id) && (
+                            <small>
+                              <Bookmark
+                                className="toc-bookmark"
+                                size={11}
+                                fill="currentColor"
+                                aria-label="ブックマーク済み"
+                              />
+                            </small>
+                          )}
+                        </span>
+                      </NavLink>
+                    ) : null;
+                  })}
+                  {!generated &&
+                    outlineChapter?.pages.map((outlinePage, pageIndex) => (
+                      <div
+                        className="chapter-page-preview"
+                        key={`${c.id}-preview-${pageIndex}`}
+                      >
+                        <FileClock size={14} />
+                        <span>
+                          <strong>
+                            {withoutPageNumberPrefix(
+                              withoutInlineLinks(outlinePage.title),
+                            )}
+                          </strong>
+                        </span>
+                      </div>
+                    ))}
+                  {generated ? (
+                    <NavLink
+                      className="chapter-quiz-link"
+                      to={`/textbooks/${book.id}/chapters/${c.id}/quiz`}
+                      onClick={onNavigate}
+                    >
+                      <CircleHelp size={14} />
+                      <span>
+                        章末確認問題
+                        <small>5問</small>
+                      </span>
+                    </NavLink>
+                  ) : ["queued", "generating"].includes(
+                      c.generationStatus ?? "",
+                    ) ? (
+                    <div className="chapter-generation-state">
+                      <LoaderCircle className="spin" size={14} />第{c.order}
+                      章を生成中… {c.generationProgress ?? 0}% ·{" "}
+                      {c.elapsedSeconds ?? 0}秒
+                    </div>
+                  ) : c.order === (book.nextChapterOrder ?? 1) ? (
+                    <button
+                      type="button"
+                      className="chapter-generate-button"
+                      onClick={() => onGenerateChapter?.(c)}
+                    >
+                      {c.generationStatus === "failed"
+                        ? `第${c.order}章を再試行`
+                        : `第${c.order}章を生成`}
+                    </button>
                   ) : (
-                    <Circle size={12} />
+                    <div className="chapter-generation-state locked">
+                      <Lock size={13} /> 前の章の生成後に利用できます
+                    </div>
                   )}
-                  <span>
-                    {withoutPageNumberPrefix(p.title)}
-                    <small>
-                      {p.readMinutes}分
-                      {bookmarkedPageIds.has(p.id) && (
-                        <Bookmark
-                          className="toc-bookmark"
-                          size={11}
-                          fill="currentColor"
-                          aria-label="ブックマーク済み"
-                        />
-                      )}
-                    </small>
-                  </span>
-                </NavLink>
-              ) : null;
-            })}
-            {c.generationStatus === "completed" || !c.generationStatus ? (
-              <NavLink
-                className="chapter-quiz-link"
-                to={`/textbooks/${book.id}/chapters/${c.id}/quiz`}
-                onClick={onNavigate}
-              >
-                <CircleHelp size={14} />
-                <span>
-                  章末確認問題
-                  <small>5問</small>
-                </span>
-              </NavLink>
-            ) : ["queued", "generating"].includes(c.generationStatus) ? (
-              <div className="chapter-generation-state">
-                <LoaderCircle className="spin" size={14} />第{c.order}
-                章を生成中… {c.generationProgress ?? 0}% ·{" "}
-                {c.elapsedSeconds ?? 0}秒
+                </div>
               </div>
-            ) : c.order === (book.nextChapterOrder ?? 1) ? (
-              <button
-                type="button"
-                className="chapter-generate-button"
-                onClick={() => onGenerateChapter?.(c)}
-              >
-                {c.generationStatus === "failed"
-                  ? `第${c.order}章を再試行`
-                  : `第${c.order}章を生成`}
-              </button>
-            ) : (
-              <div className="chapter-generation-state locked">
-                <Lock size={13} /> 前の章の生成後に利用できます
-              </div>
-            )}
-              </div>
-            </div>
-          </section>
+            </section>
           );
         })}
       </nav>
