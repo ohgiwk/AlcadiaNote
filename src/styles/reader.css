@@ -457,6 +457,56 @@
   font: inherit;
   white-space: pre;
 }
+.reader-code-block .hljs-comment,
+.reader-code-block .hljs-quote {
+  color: #7f8fa6;
+  font-style: italic;
+}
+.reader-code-block .hljs-keyword,
+.reader-code-block .hljs-selector-tag,
+.reader-code-block .hljs-built_in,
+.reader-code-block .hljs-name,
+.reader-code-block .hljs-tag {
+  color: #c792ea;
+}
+.reader-code-block .hljs-string,
+.reader-code-block .hljs-title,
+.reader-code-block .hljs-section,
+.reader-code-block .hljs-attribute,
+.reader-code-block .hljs-literal,
+.reader-code-block .hljs-template-tag,
+.reader-code-block .hljs-template-variable,
+.reader-code-block .hljs-type {
+  color: #c3e88d;
+}
+.reader-code-block .hljs-number,
+.reader-code-block .hljs-symbol,
+.reader-code-block .hljs-bullet,
+.reader-code-block .hljs-variable,
+.reader-code-block .hljs-meta {
+  color: #f78c6c;
+}
+.reader-code-block .hljs-title.function_,
+.reader-code-block .hljs-function .hljs-title,
+.reader-code-block .hljs-selector-id,
+.reader-code-block .hljs-selector-class {
+  color: #82aaff;
+}
+.reader-code-block .hljs-attr,
+.reader-code-block .hljs-property,
+.reader-code-block .hljs-params {
+  color: #ffcb6b;
+}
+.reader-code-block .hljs-regexp,
+.reader-code-block .hljs-link {
+  color: #89ddff;
+}
+.reader-code-block .hljs-deletion {
+  color: #ff5370;
+}
+.reader-code-block .hljs-addition {
+  color: #addb67;
+}
 .paper > header {
   border-bottom: 1px solid #e9e6df;
   padding-bottom: 30px;

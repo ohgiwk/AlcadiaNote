@@ -1,6 +1,7 @@
 import { Bot, Check, Code2, Lightbulb, Play, Sparkles } from "lucide-react";
 import type { ReactNode } from "react";
 import type { ContentBlock, Highlight } from "../types/models";
+import { highlightedCode } from "../utils/highlight";
 import { withoutInlineLinks } from "../utils/text";
 
 function highlighted(text: string, highlights: Highlight[]): ReactNode {
@@ -140,20 +141,23 @@ export function ContentRenderer({
       );
     case "formula":
       return <div className="formula">{block.formula}</div>;
-    case "code":
+    case "code": {
+      const highlighted = highlightedCode(block.code, block.language || "text");
       return (
         <figure className="reader-code-block">
           <figcaption>
             <Code2 size={15} />
-            <span>{block.language || "text"}</span>
+            <span>{highlighted.language}</span>
           </figcaption>
           <pre>
-            <code className={`language-${block.language || "text"}`}>
-              {block.code}
-            </code>
+            <code
+              className={`hljs language-${highlighted.language}`}
+              dangerouslySetInnerHTML={{ __html: highlighted.html }}
+            />
           </pre>
         </figure>
       );
+    }
     case "video":
       return (
         <div className="video">
