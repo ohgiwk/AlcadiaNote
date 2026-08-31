@@ -130,13 +130,6 @@
   .map-canvas aside {
     width: 200px;
   }
-  .roadmap article {
-    grid-template-columns: 52px 1fr;
-  }
-  .roadmap article > button {
-    grid-column: 2;
-    width: max-content;
-  }
   .rating > div {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -217,12 +210,6 @@
   }
   .quiz-page main {
     padding-top: 6vh;
-  }
-  .roadmap article {
-    gap: 12px;
-  }
-  .roadmap article > button {
-    font-size: 10px;
   }
   .map-legend {
     display: none;

@@ -1,69 +1,14 @@
 import {
-  ArrowUpRight,
   BookOpen,
   Brain,
   Flame,
-  Lock,
   Minus,
   Plus,
   RotateCcw,
-  Sparkles,
   Target,
 } from "lucide-react";
 import { activities, edges, nodes } from "../mock/data";
 import { StatCard } from "../components/ui";
-export function RoadmapPage() {
-  const roadmap = [
-    ["産業革命以前のヨーロッパ", "農業社会と商業の発展", "done"],
-    ["イギリス産業革命", "技術・資本・市場の結合", "current"],
-    ["都市化と労働問題", "工場都市が生んだ課題", "next"],
-    ["資本主義と社会主義", "新しい思想と社会運動", "next"],
-  ];
-  return (
-    <div className="page">
-      <section className="title-row">
-        <div>
-          <span className="eyebrow">LEARNING PATH</span>
-          <h1>学習ロードマップ</h1>
-          <p>知識は一本道ではなく、つながりながら深まっていきます。</p>
-        </div>
-        <div className="path-progress">
-          <strong>2 / 6</strong>
-          <span>ステップ完了</span>
-        </div>
-      </section>
-      <div className="roadmap">
-        {roadmap.map((x, i) => (
-          <article className={x[2]} key={x[0]}>
-            <div className="road-number">
-              {x[2] === "done" ? (
-                "✓"
-              ) : x[2] === "current" ? (
-                <Sparkles />
-              ) : (
-                <Lock />
-              )}
-            </div>
-            <section>
-              <span>STEP {String(i + 1).padStart(2, "0")}</span>
-              <h2>{x[0]}</h2>
-              <p>{x[1]}</p>
-              <div className="skill-chips">
-                <small>{i + 2}ページ</small>
-                <small>{i + 1}クイズ</small>
-              </div>
-            </section>
-            {x[2] === "current" && (
-              <button>
-                学習を続ける <ArrowUpRight />
-              </button>
-            )}
-          </article>
-        ))}
-      </div>
-    </div>
-  );
-}
 export function KnowledgeMapPage() {
   return (
     <div className="page map-page">

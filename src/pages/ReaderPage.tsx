@@ -5,6 +5,7 @@ import {
   GalleryVerticalEnd,
   Highlighter,
   List,
+  Map,
   MoreHorizontal,
   NotebookPen,
   RefreshCw,
@@ -295,6 +296,15 @@ export function ReaderPage() {
             >
               <NotebookPen size={19} />
             </IconButton>
+            <Link
+              className="icon-button"
+              aria-label="ロードマップ"
+              title="ロードマップ"
+              to={`/textbooks/${id}/roadmap`}
+              state={{ returnTo: `/textbooks/${id}/read/${pageId}` }}
+            >
+              <Map size={19} />
+            </Link>
             <Link
               className="icon-button"
               aria-label="暗記カード"

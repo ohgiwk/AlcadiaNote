@@ -26,7 +26,10 @@ const FlashcardsPage = route(
   () => import("./pages/FlashcardsPage"),
   "FlashcardsPage",
 );
-const RoadmapPage = route(() => import("./pages/LearningPages"), "RoadmapPage");
+const TextbookRoadmapPage = route(
+  () => import("./pages/TextbookRoadmapPage"),
+  "TextbookRoadmapPage",
+);
 const KnowledgeMapPage = route(
   () => import("./pages/LearningPages"),
   "KnowledgeMapPage",
@@ -80,13 +83,16 @@ function AnimatedRoutes() {
               <Route path="/home" element={<HomePage />} />
               <Route path="/create" element={<CreatePage />} />
               <Route path="/library" element={<LibraryPage />} />
-              <Route path="/roadmap" element={<RoadmapPage />} />
               <Route path="/knowledge-map" element={<KnowledgeMapPage />} />
               <Route path="/dashboard" element={<DashboardPage />} />
             </Route>
             <Route
               path="/textbooks/:id/read/:pageId"
               element={<ReaderPage />}
+            />
+            <Route
+              path="/textbooks/:id/roadmap"
+              element={<TextbookRoadmapPage />}
             />
             <Route
               path="/textbooks/:id/chapters/:chapterId/quiz"

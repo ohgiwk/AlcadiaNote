@@ -3,7 +3,6 @@ import {
   BookOpen,
   Compass,
   Library,
-  Map,
   Menu,
   Plus,
   Search,
@@ -18,7 +17,6 @@ import { IconButton } from "../components/ui";
 const links = [
   ["/home", "ホーム", Compass],
   ["/library", "本棚", Library],
-  ["/roadmap", "ロードマップ", Map],
   ["/knowledge-map", "知識マップ", Sparkles],
   ["/dashboard", "学習記録", BarChart3],
 ] as const;
