@@ -2,7 +2,7 @@ const stringArray = { type: "array", items: { type: "string" } } as const;
 const block = {
   type: "object",
   additionalProperties: false,
-  required: ["type", "text", "title", "items", "headers", "rows"],
+  required: ["type", "text", "title", "language", "items", "headers", "rows"],
   properties: {
     type: {
       type: "string",
@@ -22,6 +22,7 @@ const block = {
     },
     text: { type: "string" },
     title: { type: "string" },
+    language: { type: "string" },
     items: stringArray,
     headers: stringArray,
     rows: { type: "array", items: stringArray },

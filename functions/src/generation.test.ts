@@ -9,6 +9,7 @@ const generatedBlock = (
   type: "paragraph",
   text: "本文",
   title: "",
+  language: "",
   items: [],
   headers: [],
   rows: [],
@@ -28,4 +29,17 @@ test("removes inline links while converting paragraph blocks", () => {
     generatedBlock({ text: "[参照名](https://example.com) の説明" }),
   );
   assert.equal("text" in block ? block.text : "", "参照名 の説明");
+});
+
+test("preserves code text and normalizes its language label", () => {
+  const block = toContentBlock(
+    generatedBlock({
+      type: "code",
+      text: "const answer = 42;",
+      language: "JavaScript ",
+    }),
+  );
+  assert.equal(block.type, "code");
+  assert.equal("language" in block ? block.language : "", "javascript");
+  assert.equal("code" in block ? block.code : "", "const answer = 42;");
 });

@@ -49,6 +49,7 @@ export interface GeneratedBlock {
   type: string;
   text: string;
   title: string;
+  language: string;
   items: string[];
   headers: string[];
   rows: string[][];

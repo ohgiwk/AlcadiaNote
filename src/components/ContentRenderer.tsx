@@ -1,4 +1,4 @@
-import { Bot, Check, Lightbulb, Play, Sparkles } from "lucide-react";
+import { Bot, Check, Code2, Lightbulb, Play, Sparkles } from "lucide-react";
 import type { ReactNode } from "react";
 import type { ContentBlock, Highlight } from "../types/models";
 import { withoutInlineLinks } from "../utils/text";
@@ -142,9 +142,17 @@ export function ContentRenderer({
       return <div className="formula">{block.formula}</div>;
     case "code":
       return (
-        <pre>
-          <code>{block.code}</code>
-        </pre>
+        <figure className="reader-code-block">
+          <figcaption>
+            <Code2 size={15} />
+            <span>{block.language || "text"}</span>
+          </figcaption>
+          <pre>
+            <code className={`language-${block.language || "text"}`}>
+              {block.code}
+            </code>
+          </pre>
+        </figure>
       );
     case "video":
       return (

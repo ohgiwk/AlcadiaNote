@@ -106,7 +106,7 @@ export function generateChapter(
   const hasResearch = chapter.sources.length > 0;
   return structuredGeneration<GeneratedChapter>({
     ...config,
-    prompt: `あなたは高品質な教科書を執筆する専門家です。第${chapterOrder}章だけを生成してください。\nテーマ: ${input.topic}\n難易度: ${input.level}\n目的: ${input.purpose}\n承認済み章構成: ${JSON.stringify(chapter)}\n各ページは構成の順番とタイトルを守り、800〜1,200文字を目安に、見出し2〜4個、定義、理由、具体例、背景、因果関係を含めて体系的に説明してください。冗長な水増し、不要な前置き、制作工程のメタ文言は禁止です。章の${chapter.pages.length}ページを横断する選択式または正誤式の確認問題を5問、章の暗記カードを2枚作成してください。本文にURLや出典表記を含めず、参照情報はsourcesだけに格納してください。`,
+    prompt: `あなたは高品質な教科書を執筆する専門家です。第${chapterOrder}章だけを生成してください。\nテーマ: ${input.topic}\n難易度: ${input.level}\n目的: ${input.purpose}\n承認済み章構成: ${JSON.stringify(chapter)}\n各ページは構成の順番とタイトルを守り、800〜1,200文字を目安に、見出し2〜4個、定義、理由、具体例、背景、因果関係を含めて体系的に説明してください。プログラミング、設定、コマンド、マークアップなどを例示する場合はcodeブロックを使い、textに実際のコードを、languageに言語名（javascript、python、bash、htmlなど）を格納してください。code以外のブロックではlanguageを空文字にしてください。冗長な水増し、不要な前置き、制作工程のメタ文言は禁止です。章の${chapter.pages.length}ページを横断する選択式または正誤式の確認問題を5問、章の暗記カードを2枚作成してください。本文にURLや出典表記を含めず、参照情報はsourcesだけに格納してください。`,
     name: "chapter_content",
     schema: buildChapterContentSchema(chapter.pages.length),
     useWebSearch: !hasResearch,
@@ -146,7 +146,16 @@ export function toContentBlock(raw: GeneratedBlock) {
         rows: raw.rows.map((row) => row.map(withoutInlineLinks)),
       };
     case "code":
-      return { id, type: "code", language: "text", code: raw.text };
+      return {
+        id,
+        type: "code",
+        language:
+          raw.language
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9+#.-]/g, "") || "text",
+        code: raw.text,
+      };
     case "question":
       return { id, type: "question", prompt: withoutInlineLinks(raw.text) };
     case "quote":
