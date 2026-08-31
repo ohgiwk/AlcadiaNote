@@ -69,19 +69,55 @@
   overscroll-behavior: contain;
 }
 .chapter-sidebar section h3 {
-  font-size: 12px;
-  padding: 11px 9px 5px;
   margin: 0;
+}
+.chapter-sidebar section h3 button {
+  width: 100%;
+  padding: 11px 9px 5px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: center;
+  text-align: left;
+  cursor: pointer;
 }
-.chapter-sidebar section h3 span {
+.chapter-sidebar section h3 button:hover {
+  background: #f0f2f5;
+}
+.chapter-sidebar section h3 strong {
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 700;
+}
+.chapter-sidebar section h3 button span {
   grid-column: 1/-1;
   font-size: 8px;
   letter-spacing: 0.14em;
   color: #9098a5;
   margin-bottom: 4px;
+}
+.chapter-sidebar section h3 svg {
+  transition: transform 0.2s ease;
+}
+.chapter-sidebar section.collapsed h3 svg {
+  transform: rotate(-90deg);
+}
+.chapter-toc-content {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition: grid-template-rows 0.22s ease, opacity 0.18s ease;
+}
+.chapter-toc-content > div {
+  min-height: 0;
+  overflow: hidden;
+}
+.chapter-sidebar section.collapsed .chapter-toc-content {
+  grid-template-rows: 0fr;
+  opacity: 0;
 }
 .chapter-sidebar nav a {
   display: flex;

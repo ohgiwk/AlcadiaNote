@@ -7,6 +7,7 @@ import {
   LoaderCircle,
   Lock,
 } from "lucide-react";
+import { useState } from "react";
 import { NavLink } from "react-router-dom";
 import type { Chapter, Page, Textbook } from "../../types/models";
 import { withoutPageNumberPrefix } from "../../utils/text";
@@ -26,6 +27,17 @@ export function ChapterSidebar({
   onGenerateChapter?: (chapter: Chapter) => void;
 }) {
   const completedPages = Math.round((progressPercent / 100) * pages.length);
+  const [collapsedChapters, setCollapsedChapters] = useState<Set<string>>(
+    () => new Set(),
+  );
+  function toggleChapter(chapterId: string) {
+    setCollapsedChapters((current) => {
+      const next = new Set(current);
+      if (next.has(chapterId)) next.delete(chapterId);
+      else next.add(chapterId);
+      return next;
+    });
+  }
   return (
     <aside className="chapter-sidebar">
       <header>
@@ -36,13 +48,23 @@ export function ChapterSidebar({
         </small>
       </header>
       <nav>
-        {chapters.map((c) => (
-          <section key={c.id}>
+        {chapters.map((c) => {
+          const collapsed = collapsedChapters.has(c.id);
+          return (
+          <section className={collapsed ? "collapsed" : ""} key={c.id}>
             <h3>
-              <span>第{c.order}章</span>
-              {c.title}
-              <ChevronDown size={15} />
+              <button
+                type="button"
+                aria-expanded={!collapsed}
+                onClick={() => toggleChapter(c.id)}
+              >
+                <span>第{c.order}章</span>
+                <strong>{c.title}</strong>
+                <ChevronDown size={15} />
+              </button>
             </h3>
+            <div className="chapter-toc-content">
+              <div>
             {c.pageIds.map((id) => {
               const p = pages.find((x) => x.id === id);
               return p ? (
@@ -101,8 +123,11 @@ export function ChapterSidebar({
                 <Lock size={13} /> 前の章の生成後に利用できます
               </div>
             )}
+              </div>
+            </div>
           </section>
-        ))}
+          );
+        })}
       </nav>
       <footer>
         <div>
