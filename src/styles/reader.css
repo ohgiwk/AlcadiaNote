@@ -52,6 +52,27 @@
   padding: 25px 20px 18px;
   display: grid;
 }
+.reader-home-link {
+  width: 100%;
+  min-height: 46px;
+  margin: -7px 0 18px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+}
+.reader-toc-drawer-layer {
+  display: none;
+}
+.reader-home-link:hover,
+.reader-home-link:focus-visible {
+  background: #edf1f6;
+  color: var(--ink);
+}
 .chapter-sidebar > header strong {
   font: 600 14px var(--serif);
   margin-top: 8px;

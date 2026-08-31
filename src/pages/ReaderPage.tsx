@@ -11,6 +11,7 @@ import {
   Search,
   Settings2,
   Sparkles,
+  X,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -235,6 +236,7 @@ export function ReaderPage() {
           ),
         );
       }}
+      onNavigate={() => setToc(false)}
     />
   );
   const chat = <AIChatPanel textbookId={id} pageId={page.id} />;
@@ -443,7 +445,34 @@ export function ReaderPage() {
           </div>
         </div>
       )}
-      <Sheet open={toc} onClose={() => setToc(false)} title="目次">
+      <div
+        className={`reader-toc-drawer-layer ${compactReader && toc ? "open" : ""}`}
+        aria-hidden={!compactReader || !toc}
+      >
+        <button
+          type="button"
+          className="reader-toc-drawer-backdrop"
+          aria-label="目次を閉じる"
+          tabIndex={compactReader && toc ? 0 : -1}
+          onClick={() => setToc(false)}
+        />
+        <aside
+          className="reader-toc-drawer"
+          role="dialog"
+          aria-modal="true"
+          aria-label="目次"
+        >
+          <IconButton label="目次を閉じる" onClick={() => setToc(false)}>
+            <X size={19} />
+          </IconButton>
+          {sidebar}
+        </aside>
+      </div>
+      <Sheet
+        open={toc && !compactReader}
+        onClose={() => setToc(false)}
+        title="目次"
+      >
         {sidebar}
       </Sheet>
       <Sheet

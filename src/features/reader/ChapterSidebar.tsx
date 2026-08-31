@@ -4,11 +4,12 @@ import {
   ChevronDown,
   Circle,
   CircleHelp,
+  Home,
   LoaderCircle,
   Lock,
 } from "lucide-react";
 import { useState } from "react";
-import { NavLink } from "react-router-dom";
+import { Link, NavLink } from "react-router-dom";
 import type { Chapter, Page, Textbook } from "../../types/models";
 import { withoutPageNumberPrefix } from "../../utils/text";
 export function ChapterSidebar({
@@ -18,6 +19,7 @@ export function ChapterSidebar({
   bookmarkedPageIds = new Set<string>(),
   progressPercent = 0,
   onGenerateChapter,
+  onNavigate,
 }: {
   book: Textbook;
   chapters: Chapter[];
@@ -25,6 +27,7 @@ export function ChapterSidebar({
   bookmarkedPageIds?: Set<string>;
   progressPercent?: number;
   onGenerateChapter?: (chapter: Chapter) => void;
+  onNavigate?: () => void;
 }) {
   const completedPages = Math.round((progressPercent / 100) * pages.length);
   const [collapsedChapters, setCollapsedChapters] = useState<Set<string>>(
@@ -41,6 +44,10 @@ export function ChapterSidebar({
   return (
     <aside className="chapter-sidebar">
       <header>
+        <Link className="reader-home-link" to="/home" onClick={onNavigate}>
+          <Home size={15} />
+          ホームへ戻る
+        </Link>
         <span className="eyebrow">CONTENTS</span>
         <strong>{book.title}</strong>
         <small>
@@ -68,7 +75,11 @@ export function ChapterSidebar({
             {c.pageIds.map((id) => {
               const p = pages.find((x) => x.id === id);
               return p ? (
-                <NavLink to={`/textbooks/${book.id}/read/${p.id}`} key={id}>
+                <NavLink
+                  to={`/textbooks/${book.id}/read/${p.id}`}
+                  key={id}
+                  onClick={onNavigate}
+                >
                   {p.order <= completedPages ? (
                     <Check size={14} />
                   ) : (
@@ -95,6 +106,7 @@ export function ChapterSidebar({
               <NavLink
                 className="chapter-quiz-link"
                 to={`/textbooks/${book.id}/chapters/${c.id}/quiz`}
+                onClick={onNavigate}
               >
                 <CircleHelp size={14} />
                 <span>
