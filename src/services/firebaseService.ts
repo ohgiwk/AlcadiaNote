@@ -186,11 +186,16 @@ export async function saveProgress(
   textbookId: string,
   pageId: string,
   percent: number,
+  options: { allowPercentDecrease?: boolean } = {},
 ) {
   const progressRef = doc(db, `users/${uid}/progress/${textbookId}`);
   await runTransaction(db, async (transaction) => {
     const current = await transaction.get(progressRef);
-    if (current.exists() && Number(current.data().percent ?? 0) >= percent) {
+    if (
+      current.exists() &&
+      Number(current.data().percent ?? 0) >= percent &&
+      !options.allowPercentDecrease
+    ) {
       transaction.update(progressRef, { updatedAt: serverTimestamp() });
       return;
     }

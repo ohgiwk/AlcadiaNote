@@ -24,7 +24,10 @@ import { ChapterSidebar } from "../features/reader/ChapterSidebar";
 import { ReaderFooter } from "../features/reader/ReaderFooter";
 import { ReaderNotesPanel } from "../features/reader/ReaderNotesPanel";
 import { TextbookSearch } from "../features/reader/TextbookSearch";
-import { useReadingProgress } from "../features/reader/useReadingProgress";
+import {
+  getReadingProgressState,
+  useReadingProgress,
+} from "../features/reader/useReadingProgress";
 import { useCollection, useDocument } from "../hooks/useFirestoreData";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { useTextbook } from "../hooks/useTextbook";
@@ -94,6 +97,17 @@ export function ReaderPage() {
     bookmarks.filter((x) => x.textbookId === id).map((x) => x.pageId),
   );
   const marked = bookmarkedPageIds.has(pageId);
+  const totalPageCount =
+    book?.outline?.chapters.reduce(
+      (total, chapter) => total + chapter.pages.length,
+      0,
+    ) ?? pages.length;
+  const readingProgress = getReadingProgressState({
+    pages,
+    currentPageId: pageId,
+    savedPageId: savedProgress?.pageId,
+    totalPageCount,
+  });
   const { data: notes } = useCollection<Note>(`users/${user?.uid}/notes`, {
     enabled: Boolean(user),
     filters: user ? [["ownerId", "==", user.uid]] : [],
@@ -131,8 +145,9 @@ export function ReaderPage() {
     uid: user?.uid,
     textbookId: id,
     page,
-    pageIndex: idx,
-    pageCount: pages.length,
+    pages,
+    totalPageCount,
+    savedProgress,
   });
   if (loading) return <div className="page">教科書を読み込んでいます…</div>;
   if (!book || !page)
@@ -228,7 +243,12 @@ export function ReaderPage() {
       chapters={chapters}
       pages={pages}
       bookmarkedPageIds={bookmarkedPageIds}
-      progressPercent={savedProgress?.percent ?? 0}
+      progressPercent={readingProgress.percent}
+      completedPageIds={new Set(
+        pages
+          .slice(0, readingProgress.completedPageIndex + 1)
+          .map((candidate) => candidate.id),
+      )}
       onGenerateChapter={() => {
         setChapterError("");
         void requestNextChapterGeneration(id).catch((error) =>

@@ -19,6 +19,7 @@ export function ChapterSidebar({
   pages,
   bookmarkedPageIds = new Set<string>(),
   progressPercent = 0,
+  completedPageIds = new Set<string>(),
   onGenerateChapter,
   onNavigate,
 }: {
@@ -27,10 +28,10 @@ export function ChapterSidebar({
   pages: Page[];
   bookmarkedPageIds?: Set<string>;
   progressPercent?: number;
+  completedPageIds?: Set<string>;
   onGenerateChapter?: (chapter: Chapter) => void;
   onNavigate?: () => void;
 }) {
-  const completedPages = Math.round((progressPercent / 100) * pages.length);
   const [collapsedChapters, setCollapsedChapters] = useState<Set<string>>(
     () =>
       new Set(
@@ -101,7 +102,7 @@ export function ChapterSidebar({
                         key={id}
                         onClick={onNavigate}
                       >
-                        {p.order <= completedPages ? (
+                        {completedPageIds.has(p.id) ? (
                           <Check size={14} />
                         ) : (
                           <Circle size={12} />
