@@ -134,7 +134,8 @@ export async function toggleBookmark(
     await Promise.all(found.docs.map((x) => deleteDoc(x.ref)));
     return false;
   }
-  const ref = doc(collection(db, `users/${uid}/bookmarks`));
+  // A deterministic id makes two concurrent toggles converge on one document.
+  const ref = doc(db, `users/${uid}/bookmarks/${textbookId}__${pageId}`);
   await setDoc(ref, {
     ownerId: uid,
     textbookId,
@@ -252,16 +253,23 @@ export async function rateFlashcard(
   cardId: string,
   mastery: number,
 ) {
-  await setDoc(
-    doc(db, `users/${uid}/flashcardProgress/${cardId}`),
-    {
+  const progressRef = doc(db, `users/${uid}/flashcardProgress/${cardId}`);
+  await runTransaction(db, async (transaction) => {
+    const current = await transaction.get(progressRef);
+    const data = {
       ownerId: uid,
       textbookId,
       cardId,
       mastery,
       updatedAt: serverTimestamp(),
-      createdAt: serverTimestamp(),
-    },
-    { merge: true },
-  );
+    };
+    if (current.exists()) {
+      transaction.update(progressRef, data);
+    } else {
+      transaction.set(progressRef, {
+        ...data,
+        createdAt: serverTimestamp(),
+      });
+    }
+  });
 }

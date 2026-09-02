@@ -34,7 +34,6 @@ export function useReadingProgress(options: {
   const { uid, textbookId, page, pages, totalPageCount, savedProgress } =
     options;
   const savedPageId = savedProgress?.pageId;
-  const savedPercent = savedProgress?.percent ?? 0;
 
   useEffect(() => {
     document.querySelector(".reader-scroll")?.scrollTo(0, 0);
@@ -48,12 +47,6 @@ export function useReadingProgress(options: {
     });
     const progressPage = progress.progressPage ?? page;
 
-    void saveProgress(
-      uid,
-      textbookId,
-      progressPage.id,
-      progress.percent,
-      { allowPercentDecrease: savedPercent > progress.percent },
-    );
-  }, [page, pages, savedPageId, savedPercent, textbookId, totalPageCount, uid]);
+    void saveProgress(uid, textbookId, progressPage.id, progress.percent);
+  }, [page, pages, savedPageId, textbookId, totalPageCount, uid]);
 }

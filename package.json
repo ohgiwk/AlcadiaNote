@@ -9,9 +9,10 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "functions:build": "npm --prefix functions run build",
+    "test:frontend": "vitest run",
     "test:functions": "npm --prefix functions run build && npm --prefix functions test",
     "test:rules": "firebase emulators:exec --only firestore --project demo-arcadia-test \"node --test firestore.rules.test.mjs\"",
-    "test": "npm run test:functions && npm run test:rules",
+    "test": "npm run test:frontend && npm run test:functions && npm run test:rules",
     "emulators": "firebase emulators:start",
     "deploy": "npm run build && npm run functions:build && firebase deploy"
   },
@@ -37,6 +38,7 @@
     "globals": "latest",
     "prettier": "latest",
     "typescript": "latest",
-    "typescript-eslint": "latest"
+    "typescript-eslint": "latest",
+    "vitest": "^4.1.11"
   }
 }
