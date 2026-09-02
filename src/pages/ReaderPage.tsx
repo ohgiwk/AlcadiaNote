@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../auth";
 import { ContentRenderer } from "../components/ContentRenderer";
@@ -73,6 +74,9 @@ export function ReaderPage() {
   const [tocCollapsed, setTocCollapsed] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<"ai" | "notes" | null>(null);
   const [sidePanel, setSidePanel] = useState<"ai" | "notes" | null>("ai");
+  const [tocWidth, setTocWidth] = useState(250);
+  const [sidePanelWidth, setSidePanelWidth] = useState(310);
+  const [resizingPane, setResizingPane] = useState<"toc" | "side" | null>(null);
   const compactReader = useMediaQuery("(max-width: 800px)");
   const compactToc = useMediaQuery("(max-width: 1100px)");
   const [searchOpen, setSearchOpen] = useState(false);
@@ -93,6 +97,55 @@ export function ReaderPage() {
   } | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
+  const readerRef = useRef<HTMLDivElement>(null);
+
+  const clampPaneWidth = useCallback(
+    (pane: "toc" | "side", width: number) => {
+      const readerWidth = readerRef.current?.getBoundingClientRect().width ?? window.innerWidth;
+      const otherWidth = pane === "toc" && sidePanel ? sidePanelWidth : pane === "side" && !tocCollapsed ? tocWidth : 0;
+      const maximum = Math.max(180, Math.min(480, readerWidth - otherWidth - 430));
+      return Math.min(maximum, Math.max(180, width));
+    },
+    [sidePanel, sidePanelWidth, tocCollapsed, tocWidth],
+  );
+
+  const startPaneResize = useCallback(
+    (pane: "toc" | "side", event: React.PointerEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      const reader = readerRef.current;
+      if (!reader) return;
+      const bounds = reader.getBoundingClientRect();
+      setResizingPane(pane);
+      event.currentTarget.setPointerCapture(event.pointerId);
+
+      const handleMove = (moveEvent: PointerEvent) => {
+        const width = pane === "toc" ? moveEvent.clientX - bounds.left : bounds.right - moveEvent.clientX;
+        const nextWidth = clampPaneWidth(pane, width);
+        if (pane === "toc") setTocWidth(nextWidth);
+        else setSidePanelWidth(nextWidth);
+      };
+      const handleUp = () => {
+        setResizingPane(null);
+        window.removeEventListener("pointermove", handleMove);
+        window.removeEventListener("pointerup", handleUp);
+      };
+      window.addEventListener("pointermove", handleMove);
+      window.addEventListener("pointerup", handleUp);
+    },
+    [clampPaneWidth],
+  );
+
+  const resizePaneWithKeyboard = useCallback(
+    (pane: "toc" | "side", event: ReactKeyboardEvent<HTMLDivElement>) => {
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+      event.preventDefault();
+      const direction = event.key === "ArrowRight" ? 1 : -1;
+      const delta = pane === "toc" ? direction * 16 : direction * -16;
+      if (pane === "toc") setTocWidth((width) => clampPaneWidth(pane, width + delta));
+      else setSidePanelWidth((width) => clampPaneWidth(pane, width + delta));
+    },
+    [clampPaneWidth],
+  );
   const bookmarkedPageIds = new Set(
     bookmarks.filter((x) => x.textbookId === id).map((x) => x.pageId),
   );
@@ -274,9 +327,28 @@ export function ReaderPage() {
   );
   return (
     <div
+      ref={readerRef}
       className={`reader ${sidePanel ? "" : "chat-closed"} ${tocCollapsed ? "toc-closed" : ""}`}
+      style={{
+        "--reader-toc-width": `${tocWidth}px`,
+        "--reader-side-width": `${sidePanelWidth}px`,
+      } as CSSProperties}
     >
       {!tocCollapsed && <div className="reader-toc desktop">{sidebar}</div>}
+      {!tocCollapsed && (
+        <div
+          className={`reader-resizer reader-resizer-toc desktop ${resizingPane === "toc" ? "active" : ""}`}
+          role="separator"
+          aria-label="目次の幅を変更"
+          aria-orientation="vertical"
+          aria-valuemin={180}
+          aria-valuemax={480}
+          aria-valuenow={Math.round(tocWidth)}
+          tabIndex={0}
+          onPointerDown={(event) => startPaneResize("toc", event)}
+          onKeyDown={(event) => resizePaneWithKeyboard("toc", event)}
+        />
+      )}
       <section className="reader-center">
         <header className="reader-toolbar">
           <IconButton
@@ -470,6 +542,20 @@ export function ReaderPage() {
           onNavigate={nav}
         />
       </section>
+      {sidePanel && (
+        <div
+          className={`reader-resizer reader-resizer-side desktop ${resizingPane === "side" ? "active" : ""}`}
+          role="separator"
+          aria-label="右ペインの幅を変更"
+          aria-orientation="vertical"
+          aria-valuemin={180}
+          aria-valuemax={480}
+          aria-valuenow={Math.round(sidePanelWidth)}
+          tabIndex={0}
+          onPointerDown={(event) => startPaneResize("side", event)}
+          onKeyDown={(event) => resizePaneWithKeyboard("side", event)}
+        />
+      )}
       {sidePanel && <div className="reader-ai desktop">
         <div className="reader-side-toolbar" role="toolbar" aria-label="右ペイン">
           <button

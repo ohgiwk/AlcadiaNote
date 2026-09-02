@@ -1,18 +1,21 @@
 .reader {
+  --reader-toc-width: 250px;
+  --reader-side-width: 310px;
   height: 100vh;
   height: 100dvh;
   min-height: 0;
   overflow: hidden;
   display: grid;
-  grid-template-columns: 250px minmax(430px, 1fr) 310px;
+  grid-template-columns: var(--reader-toc-width) minmax(430px, 1fr) var(--reader-side-width);
   background: #f6f5f2;
   transition: grid-template-columns 0.26s ease;
+  position: relative;
 }
 .reader.chat-closed {
-  grid-template-columns: 250px minmax(430px, 1fr);
+  grid-template-columns: var(--reader-toc-width) minmax(430px, 1fr);
 }
 .reader.toc-closed {
-  grid-template-columns: minmax(430px, 1fr) 310px;
+  grid-template-columns: minmax(430px, 1fr) var(--reader-side-width);
 }
 .reader.toc-closed.chat-closed {
   grid-template-columns: minmax(430px, 1fr);
@@ -23,6 +26,41 @@
   min-height: 0;
   height: 100%;
   overflow: hidden;
+}
+.reader-resizer {
+  position: absolute;
+  z-index: 20;
+  top: 0;
+  bottom: 0;
+  width: 9px;
+  cursor: col-resize;
+  touch-action: none;
+  transform: translateX(-50%);
+  outline: none;
+}
+.reader-resizer::after {
+  content: "";
+  position: absolute;
+  inset: 0 3px;
+  background: transparent;
+  transition: background 0.15s ease;
+}
+.reader-resizer:hover::after,
+.reader-resizer:focus-visible::after,
+.reader-resizer.active::after {
+  background: var(--primary);
+}
+.reader-resizer-toc {
+  left: var(--reader-toc-width);
+}
+.reader-resizer-side {
+  right: var(--reader-side-width);
+  transform: translateX(50%);
+}
+.reader:has(.reader-resizer.active) {
+  cursor: col-resize;
+  user-select: none;
+  transition: none;
 }
 .reader-ai {
   display: grid;
