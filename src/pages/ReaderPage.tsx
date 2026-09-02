@@ -51,6 +51,21 @@ import {
   withoutInlineLinks,
   withoutPageNumberPrefix,
 } from "../utils/text";
+
+type ReaderSidePanel = "ai" | "notes" | "quizzes" | null;
+
+function getSavedSidePanel(textbookId: string): ReaderSidePanel {
+  try {
+    const saved = sessionStorage.getItem(`reader-side-panel:${textbookId}`);
+    if (saved === "closed") return null;
+    if (saved === "ai" || saved === "notes" || saved === "quizzes")
+      return saved;
+  } catch {
+    // Storage may be unavailable in restricted browser contexts.
+  }
+  return "ai";
+}
+
 export function ReaderPage() {
   const { id = "", pageId = "" } = useParams();
   const { user } = useAuth();
@@ -77,8 +92,8 @@ export function ReaderPage() {
   const [mobilePanel, setMobilePanel] = useState<
     "ai" | "notes" | "quizzes" | null
   >(null);
-  const [sidePanel, setSidePanel] = useState<"ai" | "notes" | "quizzes" | null>(
-    "ai",
+  const [sidePanel, setSidePanel] = useState<ReaderSidePanel>(() =>
+    getSavedSidePanel(id),
   );
   const [tocWidth, setTocWidth] = useState(250);
   const [sidePanelWidth, setSidePanelWidth] = useState(310);
@@ -212,6 +227,13 @@ export function ReaderPage() {
     document.addEventListener("mousedown", close);
     return () => document.removeEventListener("mousedown", close);
   }, [moreOpen]);
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(`reader-side-panel:${id}`, sidePanel ?? "closed");
+    } catch {
+      // Keep the in-memory state when storage is unavailable.
+    }
+  }, [id, sidePanel]);
   useReadingProgress({
     uid: user?.uid,
     textbookId: id,
@@ -240,7 +262,7 @@ export function ReaderPage() {
       setBookmarking(false);
     }
   }
-  function showPanel(panel: "ai" | "notes" | "quizzes") {
+  function showPanel(panel: Exclude<ReaderSidePanel, null>) {
     if (compactReader) {
       setMobilePanel(panel);
       return;
