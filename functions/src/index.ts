@@ -6,6 +6,13 @@ import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { defineSecret, defineString } from "firebase-functions/params";
 import { queueChapterContentWrites } from "./chapter-writes.js";
 import {
+  canQueueChapter,
+  chapterCompletionState,
+  chapterFailureBookStatus,
+  chapterPageOrderStart,
+  hasActiveGenerationLock,
+} from "./generation-state.js";
+import {
   generateChapter,
   generateOutline,
   generateQuizzes,
@@ -145,7 +152,7 @@ export const createTextbook = onCall(
     await db.runTransaction(async (tx) => {
       const generationLock = await tx.get(generationLockRef);
       const lockCreatedAt = generationLock.data()?.createdAt?.toMillis?.() ?? 0;
-      if (generationLock.exists && Date.now() - lockCreatedAt < 15 * 60_000)
+      if (hasActiveGenerationLock(generationLock.exists, lockCreatedAt))
         throw new HttpsError("resource-exhausted", "生成中の教科書があります");
       tx.set(book, {
         ownerId: request.auth!.uid,
@@ -513,7 +520,7 @@ export const reviseTextbookOutline = onCall(
       )
         throw new HttpsError("invalid-argument", "調整内容を入力してください");
       const lockCreatedAt = lock.data()?.createdAt?.toMillis?.() ?? 0;
-      if (lock.exists && Date.now() - lockCreatedAt < 15 * 60_000)
+      if (hasActiveGenerationLock(lock.exists, lockCreatedAt))
         throw new HttpsError("resource-exhausted", "別の生成処理が進行中です");
       const bookRef = db.doc(`textbooks/${data.textbookId}`);
       const now = FieldValue.serverTimestamp();
@@ -648,7 +655,7 @@ export const approveTextbookOutline = onCall(
       if (!job.data()?.outline)
         throw new HttpsError("failed-precondition", "ロードマップがありません");
       const lockCreatedAt = generationLock.data()?.createdAt?.toMillis?.() ?? 0;
-      if (generationLock.exists && Date.now() - lockCreatedAt < 15 * 60_000)
+      if (hasActiveGenerationLock(generationLock.exists, lockCreatedAt))
         throw new HttpsError("resource-exhausted", "生成中の章があります");
       const bookRef = db.doc(`textbooks/${job.data()!.textbookId}`);
       const outline = job.data()!.outline as TextbookOutline;
@@ -732,8 +739,10 @@ export const requestNextChapterGeneration = onCall(
       if (!book.exists || book.data()?.ownerId !== request.auth!.uid)
         throw new HttpsError("permission-denied", "生成する権限がありません");
       const lockCreatedAt = generationLock.data()?.createdAt?.toMillis?.() ?? 0;
-      const hasActiveLock =
-        generationLock.exists && Date.now() - lockCreatedAt < 15 * 60_000;
+      const hasActiveLock = hasActiveGenerationLock(
+        generationLock.exists,
+        lockCreatedAt,
+      );
       if (hasActiveLock)
         throw new HttpsError("resource-exhausted", "生成中の章があります");
       const order = Number(book.data()?.nextChapterOrder ?? 1);
@@ -748,13 +757,7 @@ export const requestNextChapterGeneration = onCall(
       const chapter = await tx.get(chapterRef);
       if (!chapter.exists)
         throw new HttpsError("failed-precondition", "章の構成がありません");
-      if (
-        !["pending", "failed", "queued", "generating"].includes(
-          chapter.data()?.generationStatus,
-        ) ||
-        (["queued", "generating"].includes(chapter.data()?.generationStatus) &&
-          !generationLock.exists)
-      )
+      if (!canQueueChapter(chapter.data()?.generationStatus, generationLock.exists))
         throw new HttpsError("failed-precondition", "この章は生成できません");
       const outlineChapter = book.data()?.outline?.chapters?.[order - 1];
       if (!outlineChapter)
@@ -1007,19 +1010,19 @@ export const processTextbookChapter = onDocumentCreated(
         }),
       ]);
       const result = generated.data;
+      const book = await bookRef.get();
+      const outline = book.data()?.outline as TextbookOutline | undefined;
+      if (!outline) throw new Error("missing_textbook_outline");
       const batch = db.batch();
       const pageIds = queueChapterContentWrites({
         batch,
         bookRef,
         chapterId: claimed.chapterId,
-        chapterOrder: claimed.chapterOrder,
+        pageOrderStart: chapterPageOrderStart(outline, claimed.chapterOrder),
         approvedChapter: claimed.outlineChapter as OutlineChapter,
         result,
       });
       const count = claimed.chapterOrder;
-      const book = await bookRef.get();
-      const completed =
-        count === Number(book.data()?.outline?.chapters?.length ?? 0);
       batch.update(chapterRef, {
         pageIds,
         generationStatus: "completed",
@@ -1028,10 +1031,7 @@ export const processTextbookChapter = onDocumentCreated(
         updatedAt: FieldValue.serverTimestamp(),
       });
       batch.update(bookRef, {
-        generatedChapterCount: count,
-        nextChapterOrder: count + 1,
-        activeChapterId: null,
-        generationStatus: completed ? "completed" : "ready",
+        ...chapterCompletionState(count, outline.chapters.length),
         ...(count === 1 ? { firstPageId: pageIds[0] } : {}),
         updatedAt: FieldValue.serverTimestamp(),
       });
@@ -1067,7 +1067,7 @@ export const processTextbookChapter = onDocumentCreated(
         });
         tx.update(bookRef, {
           activeChapterId: null,
-          generationStatus: claimed.chapterOrder === 1 ? "failed" : "ready",
+          generationStatus: chapterFailureBookStatus(claimed.chapterOrder),
           updatedAt: FieldValue.serverTimestamp(),
         });
         tx.delete(generationLockRef);

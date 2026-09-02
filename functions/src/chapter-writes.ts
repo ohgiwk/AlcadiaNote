@@ -11,15 +11,19 @@ interface ChapterWriteOptions {
   batch: WriteBatch;
   bookRef: DocumentReference;
   chapterId: string;
-  chapterOrder: number;
+  pageOrderStart: number;
   approvedChapter: OutlineChapter;
   result: GeneratedChapter;
 }
 
 export function queueChapterContentWrites(options: ChapterWriteOptions) {
-  const { batch, bookRef, chapterId, chapterOrder, approvedChapter, result } =
+  const { batch, bookRef, chapterId, pageOrderStart, approvedChapter, result } =
     options;
   const pageIds: string[] = [];
+
+  if (result.pages.length !== approvedChapter.pages.length) {
+    throw new Error("generated_page_count_mismatch");
+  }
 
   for (const [index, page] of result.pages.entries()) {
     const pageRef = bookRef
@@ -29,7 +33,7 @@ export function queueChapterContentWrites(options: ChapterWriteOptions) {
     batch.set(pageRef, {
       chapterId,
       title: approvedChapter.pages[index].title,
-      order: (chapterOrder - 1) * 3 + index + 1,
+      order: pageOrderStart + index + 1,
       readMinutes: page.readMinutes,
       blocks: page.blocks
         .filter(
