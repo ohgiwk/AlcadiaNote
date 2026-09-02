@@ -129,6 +129,9 @@ export interface Chapter extends BaseEntity {
   generationProgress?: number;
   elapsedSeconds?: number;
   errorCode?: string;
+  quizGenerationStatus?: "generating" | "completed" | "failed";
+  quizGenerationCount?: number;
+  quizGenerationError?: string;
 }
 export interface Textbook extends BaseEntity {
   ownerId?: ID;

@@ -46,32 +46,5 @@ export function queueChapterContentWrites(options: ChapterWriteOptions) {
     });
   }
 
-  for (const [index, quiz] of result.quizzes.entries()) {
-    batch.set(
-      bookRef.collection("quizzes").doc(`${chapterId}-quiz-${index + 1}`),
-      {
-        ...quiz,
-        chapterId,
-        order: index + 1,
-        createdAt: FieldValue.serverTimestamp(),
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-    );
-  }
-
-  for (const [index, card] of result.flashcards.entries()) {
-    batch.set(
-      bookRef.collection("flashcards").doc(`${chapterId}-card-${index + 1}`),
-      {
-        textbookId: bookRef.id,
-        chapterId,
-        ...card,
-        mastery: 0,
-        createdAt: FieldValue.serverTimestamp(),
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-    );
-  }
-
   return pageIds;
 }

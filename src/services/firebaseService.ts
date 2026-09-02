@@ -89,6 +89,18 @@ export async function requestNextChapterGeneration(textbookId: string) {
     )({ textbookId })
   ).data;
 }
+export async function generateChapterQuizzes(input: {
+  textbookId: string;
+  chapterId: string;
+  questionCount: number;
+}) {
+  return (
+    await httpsCallable<typeof input, { questionCount: number }>(
+      functions,
+      "generateChapterQuizzes",
+    )(input)
+  ).data;
+}
 export async function askPageQuestion(input: AIConversationRequest) {
   return (
     await httpsCallable<AIConversationRequest, { answer: string }>(

@@ -5,6 +5,7 @@ import {
   GalleryVerticalEnd,
   Highlighter,
   List,
+  ListChecks,
   Map,
   MoreHorizontal,
   NotebookPen,
@@ -24,6 +25,7 @@ import { AIChatPanel } from "../features/reader/AIChatPanel";
 import { ChapterSidebar } from "../features/reader/ChapterSidebar";
 import { ReaderFooter } from "../features/reader/ReaderFooter";
 import { ReaderNotesPanel } from "../features/reader/ReaderNotesPanel";
+import { QuizGeneratorPanel } from "../features/reader/QuizGeneratorPanel";
 import { TextbookSearch } from "../features/reader/TextbookSearch";
 import {
   getReadingProgressState,
@@ -53,7 +55,7 @@ export function ReaderPage() {
   const { id = "", pageId = "" } = useParams();
   const { user } = useAuth();
   const nav = useNavigate();
-  const { book, chapters, pages, loading } = useTextbook(id);
+  const { book, chapters, pages, quizzes, loading } = useTextbook(id);
   const bookmarks = useCollection<BookmarkModel>(
     `users/${user?.uid}/bookmarks`,
     {
@@ -72,8 +74,12 @@ export function ReaderPage() {
   const idx = pages.indexOf(page!);
   const [toc, setToc] = useState(false);
   const [tocCollapsed, setTocCollapsed] = useState(false);
-  const [mobilePanel, setMobilePanel] = useState<"ai" | "notes" | null>(null);
-  const [sidePanel, setSidePanel] = useState<"ai" | "notes" | null>("ai");
+  const [mobilePanel, setMobilePanel] = useState<
+    "ai" | "notes" | "quizzes" | null
+  >(null);
+  const [sidePanel, setSidePanel] = useState<"ai" | "notes" | "quizzes" | null>(
+    "ai",
+  );
   const [tocWidth, setTocWidth] = useState(250);
   const [sidePanelWidth, setSidePanelWidth] = useState(310);
   const [resizingPane, setResizingPane] = useState<"toc" | "side" | null>(null);
@@ -101,9 +107,18 @@ export function ReaderPage() {
 
   const clampPaneWidth = useCallback(
     (pane: "toc" | "side", width: number) => {
-      const readerWidth = readerRef.current?.getBoundingClientRect().width ?? window.innerWidth;
-      const otherWidth = pane === "toc" && sidePanel ? sidePanelWidth : pane === "side" && !tocCollapsed ? tocWidth : 0;
-      const maximum = Math.max(180, Math.min(480, readerWidth - otherWidth - 430));
+      const readerWidth =
+        readerRef.current?.getBoundingClientRect().width ?? window.innerWidth;
+      const otherWidth =
+        pane === "toc" && sidePanel
+          ? sidePanelWidth
+          : pane === "side" && !tocCollapsed
+            ? tocWidth
+            : 0;
+      const maximum = Math.max(
+        180,
+        Math.min(480, readerWidth - otherWidth - 430),
+      );
       return Math.min(maximum, Math.max(180, width));
     },
     [sidePanel, sidePanelWidth, tocCollapsed, tocWidth],
@@ -119,7 +134,10 @@ export function ReaderPage() {
       event.currentTarget.setPointerCapture(event.pointerId);
 
       const handleMove = (moveEvent: PointerEvent) => {
-        const width = pane === "toc" ? moveEvent.clientX - bounds.left : bounds.right - moveEvent.clientX;
+        const width =
+          pane === "toc"
+            ? moveEvent.clientX - bounds.left
+            : bounds.right - moveEvent.clientX;
         const nextWidth = clampPaneWidth(pane, width);
         if (pane === "toc") setTocWidth(nextWidth);
         else setSidePanelWidth(nextWidth);
@@ -141,7 +159,8 @@ export function ReaderPage() {
       event.preventDefault();
       const direction = event.key === "ArrowRight" ? 1 : -1;
       const delta = pane === "toc" ? direction * 16 : direction * -16;
-      if (pane === "toc") setTocWidth((width) => clampPaneWidth(pane, width + delta));
+      if (pane === "toc")
+        setTocWidth((width) => clampPaneWidth(pane, width + delta));
       else setSidePanelWidth((width) => clampPaneWidth(pane, width + delta));
     },
     [clampPaneWidth],
@@ -179,8 +198,7 @@ export function ReaderPage() {
     b.updatedAt.localeCompare(a.updatedAt),
   )[0];
   const pageHighlights = highlights.filter(
-    (highlight) =>
-      highlight.textbookId === id && highlight.pageId === pageId,
+    (highlight) => highlight.textbookId === id && highlight.pageId === pageId,
   );
   const selectedHighlight = selection
     ? pageHighlights.find((highlight) => highlight.text === selection.text)
@@ -222,7 +240,7 @@ export function ReaderPage() {
       setBookmarking(false);
     }
   }
-  function showPanel(panel: "ai" | "notes") {
+  function showPanel(panel: "ai" | "notes" | "quizzes") {
     if (compactReader) {
       setMobilePanel(panel);
       return;
@@ -253,7 +271,10 @@ export function ReaderPage() {
     setSelection({
       pageId,
       text: text.slice(0, 2000),
-      x: Math.min(window.innerWidth - 126, Math.max(12, rect.left + rect.width / 2)),
+      x: Math.min(
+        window.innerWidth - 126,
+        Math.max(12, rect.left + rect.width / 2),
+      ),
       y: Math.max(12, rect.top - 52),
     });
   }
@@ -297,11 +318,13 @@ export function ReaderPage() {
       pages={pages}
       bookmarkedPageIds={bookmarkedPageIds}
       progressPercent={readingProgress.percent}
-      completedPageIds={new Set(
-        pages
-          .slice(0, readingProgress.completedPageIndex + 1)
-          .map((candidate) => candidate.id),
-      )}
+      completedPageIds={
+        new Set(
+          pages
+            .slice(0, readingProgress.completedPageIndex + 1)
+            .map((candidate) => candidate.id),
+        )
+      }
       onGenerateChapter={() => {
         setChapterError("");
         void requestNextChapterGeneration(id).catch((error) =>
@@ -325,14 +348,23 @@ export function ReaderPage() {
       onQuoteInserted={clearNoteQuote}
     />
   );
+  const quizGenerator = (
+    <QuizGeneratorPanel
+      textbookId={id}
+      chapter={currentChapter}
+      quizzes={quizzes}
+    />
+  );
   return (
     <div
       ref={readerRef}
       className={`reader ${sidePanel ? "" : "chat-closed"} ${tocCollapsed ? "toc-closed" : ""}`}
-      style={{
-        "--reader-toc-width": `${tocWidth}px`,
-        "--reader-side-width": `${sidePanelWidth}px`,
-      } as CSSProperties}
+      style={
+        {
+          "--reader-toc-width": `${tocWidth}px`,
+          "--reader-side-width": `${sidePanelWidth}px`,
+        } as CSSProperties
+      }
     >
       {!tocCollapsed && <div className="reader-toc desktop">{sidebar}</div>}
       {!tocCollapsed && (
@@ -431,7 +463,14 @@ export function ReaderPage() {
             </div>
           </div>
         </header>
-        <div className="reader-mobile-side-toolbar" role="toolbar" aria-label="右ペイン">
+        <div
+          className="reader-mobile-side-toolbar"
+          role="toolbar"
+          aria-label="右ペイン"
+        >
+          <IconButton label="問題集を開く" onClick={() => showPanel("quizzes")}>
+            <ListChecks size={19} />
+          </IconButton>
           <IconButton label="ノートを開く" onClick={() => showPanel("notes")}>
             <NotebookPen size={19} />
           </IconButton>
@@ -445,10 +484,19 @@ export function ReaderPage() {
             role="toolbar"
             aria-label="右ペインを開く"
           >
+            <IconButton
+              label="問題集を開く"
+              onClick={() => showPanel("quizzes")}
+            >
+              <ListChecks size={19} />
+            </IconButton>
             <IconButton label="ノートを開く" onClick={() => showPanel("notes")}>
               <NotebookPen size={19} />
             </IconButton>
-            <IconButton label="AIチャットを開く" onClick={() => showPanel("ai")}>
+            <IconButton
+              label="AIチャットを開く"
+              onClick={() => showPanel("ai")}
+            >
               <Sparkles size={19} />
             </IconButton>
           </div>
@@ -556,34 +604,56 @@ export function ReaderPage() {
           onKeyDown={(event) => resizePaneWithKeyboard("side", event)}
         />
       )}
-      {sidePanel && <div className="reader-ai desktop">
-        <div className="reader-side-toolbar" role="toolbar" aria-label="右ペイン">
-          <button
-            type="button"
-            className={sidePanel === "notes" ? "active" : undefined}
-            aria-pressed={sidePanel === "notes"}
-            onClick={() => showPanel("notes")}
+      {sidePanel && (
+        <div className="reader-ai desktop">
+          <div
+            className="reader-side-toolbar"
+            role="toolbar"
+            aria-label="右ペイン"
           >
-            <NotebookPen size={17} />
-            <span>ノート</span>
-          </button>
-          <button
-            type="button"
-            className={sidePanel === "ai" ? "active" : undefined}
-            aria-pressed={sidePanel === "ai"}
-            onClick={() => showPanel("ai")}
-          >
-            <Sparkles size={17} />
-            <span>AIチャット</span>
-          </button>
-          <IconButton label="右ペインを閉じる" onClick={() => setSidePanel(null)}>
-            <X size={18} />
-          </IconButton>
+            <button
+              type="button"
+              className={sidePanel === "quizzes" ? "active" : undefined}
+              aria-pressed={sidePanel === "quizzes"}
+              onClick={() => showPanel("quizzes")}
+            >
+              <ListChecks size={17} />
+              <span>問題集</span>
+            </button>
+            <button
+              type="button"
+              className={sidePanel === "notes" ? "active" : undefined}
+              aria-pressed={sidePanel === "notes"}
+              onClick={() => showPanel("notes")}
+            >
+              <NotebookPen size={17} />
+              <span>ノート</span>
+            </button>
+            <button
+              type="button"
+              className={sidePanel === "ai" ? "active" : undefined}
+              aria-pressed={sidePanel === "ai"}
+              onClick={() => showPanel("ai")}
+            >
+              <Sparkles size={17} />
+              <span>AIチャット</span>
+            </button>
+            <IconButton
+              label="右ペインを閉じる"
+              onClick={() => setSidePanel(null)}
+            >
+              <X size={18} />
+            </IconButton>
+          </div>
+          <div className="reader-side-panel" key={sidePanel}>
+            {sidePanel === "ai"
+              ? chat
+              : sidePanel === "notes"
+                ? notebook
+                : quizGenerator}
+          </div>
         </div>
-        <div className="reader-side-panel" key={sidePanel}>
-          {sidePanel === "ai" ? chat : notebook}
-        </div>
-      </div>}
+      )}
       <div
         className={`reader-toc-drawer-layer ${compactReader && toc ? "open" : ""}`}
         aria-hidden={!compactReader || !toc}
@@ -617,9 +687,19 @@ export function ReaderPage() {
       <Sheet
         open={compactReader && mobilePanel !== null}
         onClose={() => setMobilePanel(null)}
-        title={mobilePanel === "notes" ? "このページのノート" : "Arcadia AI"}
+        title={
+          mobilePanel === "notes"
+            ? "このページのノート"
+            : mobilePanel === "quizzes"
+              ? "問題集"
+              : "Arcadia AI"
+        }
       >
-        {mobilePanel === "notes" ? notebook : chat}
+        {mobilePanel === "notes"
+          ? notebook
+          : mobilePanel === "quizzes"
+            ? quizGenerator
+            : chat}
       </Sheet>
       <Sheet
         open={searchOpen}

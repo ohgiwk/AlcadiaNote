@@ -22,7 +22,7 @@ const labels: Record<string, string> = {
   awaiting_approval: "ロードマップの確認を待っています",
   approved: "本文生成を開始しています",
   writing: "章とページを書いています",
-  finalizing: "問題とカードを仕上げています",
+  finalizing: "教科書を仕上げています",
   completed: "完成しました",
   superseded: "調整後のロードマップへ切り替えています",
   failed: "生成に失敗しました",

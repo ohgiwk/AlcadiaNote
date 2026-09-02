@@ -75,15 +75,12 @@ export interface GeneratedQuiz {
   explanation: string;
 }
 
-export interface GeneratedFlashcard {
-  front: string;
-  back: string;
-}
-
 export interface GeneratedChapter {
   pages: GeneratedPage[];
+}
+
+export interface GeneratedQuizSet {
   quizzes: GeneratedQuiz[];
-  flashcards: GeneratedFlashcard[];
 }
 
 export interface OpenAIMetadata {

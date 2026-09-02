@@ -57,12 +57,6 @@ const page = {
     sources: { type: "array", minItems: 1, maxItems: 6, items: source },
   },
 } as const;
-const flashcard = {
-  type: "object",
-  additionalProperties: false,
-  required: ["front", "back"],
-  properties: { front: { type: "string" }, back: { type: "string" } },
-} as const;
 const outlinePage = {
   type: "object",
   additionalProperties: false,
@@ -92,7 +86,7 @@ export function buildChapterContentSchema(pageCount = 3) {
   return {
     type: "object",
     additionalProperties: false,
-    required: ["pages", "quizzes", "flashcards"],
+    required: ["pages"],
     properties: {
       pages: {
         type: "array",
@@ -100,12 +94,20 @@ export function buildChapterContentSchema(pageCount = 3) {
         maxItems: pageCount,
         items: page,
       },
-      quizzes: { type: "array", minItems: 5, maxItems: 5, items: quiz },
-      flashcards: {
+    },
+  } as const;
+}
+export function buildQuizSetSchema(questionCount: number) {
+  return {
+    type: "object",
+    additionalProperties: false,
+    required: ["quizzes"],
+    properties: {
+      quizzes: {
         type: "array",
-        minItems: 2,
-        maxItems: 2,
-        items: flashcard,
+        minItems: questionCount,
+        maxItems: questionCount,
+        items: quiz,
       },
     },
   } as const;

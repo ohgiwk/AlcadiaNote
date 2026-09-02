@@ -5,7 +5,11 @@ import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { defineSecret, defineString } from "firebase-functions/params";
 import { queueChapterContentWrites } from "./chapter-writes.js";
-import { generateChapter, generateOutline } from "./generation.js";
+import {
+  generateChapter,
+  generateOutline,
+  generateQuizzes,
+} from "./generation.js";
 import { outputText } from "./openai.js";
 import type {
   OutlineChapter,
@@ -794,6 +798,125 @@ export const requestNextChapterGeneration = onCall(
       });
     });
     return { jobId: chapterJobRef.id };
+  },
+);
+
+export const generateChapterQuizzes = onCall(
+  {
+    enforceAppCheck: false,
+    timeoutSeconds: 540,
+    memory: "1GiB",
+    secrets: [openAiKey],
+  },
+  async (request) => {
+    if (!request.auth)
+      throw new HttpsError("unauthenticated", "ログインが必要です");
+    const textbookId = String(request.data?.textbookId ?? "");
+    const chapterId = String(request.data?.chapterId ?? "");
+    const questionCount = Number(request.data?.questionCount);
+    if (
+      !/^[A-Za-z0-9_-]{1,128}$/.test(textbookId) ||
+      !/^[A-Za-z0-9_-]{1,128}$/.test(chapterId) ||
+      !Number.isInteger(questionCount) ||
+      questionCount < 1 ||
+      questionCount > 20
+    )
+      throw new HttpsError("invalid-argument", "問題数またはIDが不正です");
+
+    const bookRef = db.doc(`textbooks/${textbookId}`);
+    const chapterRef = bookRef.collection("chapters").doc(chapterId);
+    const [book, chapter] = await Promise.all([
+      bookRef.get(),
+      chapterRef.get(),
+    ]);
+    if (!book.exists || book.data()?.ownerId !== request.auth.uid)
+      throw new HttpsError(
+        "permission-denied",
+        "問題を生成する権限がありません",
+      );
+    if (!chapter.exists || chapter.data()?.generationStatus !== "completed")
+      throw new HttpsError(
+        "failed-precondition",
+        "完成済みの章を選んでください",
+      );
+    if (chapter.data()?.quizGenerationStatus === "generating")
+      throw new HttpsError("resource-exhausted", "この章の問題を生成中です");
+
+    await chapterRef.update({
+      quizGenerationStatus: "generating",
+      quizGenerationCount: questionCount,
+      quizGenerationError: FieldValue.delete(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    try {
+      const pageIds = (chapter.data()?.pageIds ?? []) as string[];
+      const pageSnapshots = await Promise.all(
+        pageIds.map((pageId) => bookRef.collection("pages").doc(pageId).get()),
+      );
+      const pageContent = pageSnapshots
+        .filter((snapshot) => snapshot.exists)
+        .map((snapshot) => ({
+          title: snapshot.data()?.title,
+          blocks: snapshot.data()?.blocks,
+        }));
+      if (!pageContent.length)
+        throw new HttpsError(
+          "failed-precondition",
+          "問題の元になる本文がありません",
+        );
+      const chapterOrder = Number(chapter.data()?.order ?? 0);
+      const outlineChapter = book.data()?.outline?.chapters?.[chapterOrder - 1];
+      if (!outlineChapter)
+        throw new HttpsError("failed-precondition", "章の構成がありません");
+
+      const generated = await generateQuizzes(
+        generationConfig(),
+        {
+          topic: book.data()?.topic,
+          level: book.data()?.level,
+          purpose: book.data()?.purpose,
+        } as TextbookGenerationInput,
+        outlineChapter as OutlineChapter,
+        pageContent,
+        questionCount,
+      );
+      const existing = await bookRef
+        .collection("quizzes")
+        .where("chapterId", "==", chapterId)
+        .get();
+      const batch = db.batch();
+      for (const quiz of existing.docs) batch.delete(quiz.ref);
+      for (const [index, quiz] of generated.data.quizzes.entries()) {
+        batch.set(
+          bookRef.collection("quizzes").doc(`${chapterId}-quiz-${index + 1}`),
+          {
+            ...quiz,
+            chapterId,
+            order: index + 1,
+            createdAt: FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
+          },
+        );
+      }
+      batch.update(chapterRef, {
+        quizGenerationStatus: "completed",
+        quizGenerationCount: generated.data.quizzes.length,
+        quizGeneratedAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      await batch.commit();
+      return { questionCount: generated.data.quizzes.length };
+    } catch (error) {
+      await chapterRef.update({
+        quizGenerationStatus: "failed",
+        quizGenerationError:
+          error instanceof Error ? error.message : "quiz_generation_failed",
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      if (error instanceof HttpsError) throw error;
+      console.error("quiz_generation_failed", { textbookId, chapterId, error });
+      throw new HttpsError("internal", "問題を生成できませんでした");
+    }
   },
 );
 

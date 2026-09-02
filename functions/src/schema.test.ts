@@ -4,6 +4,7 @@ import {
   buildAdaptiveTextbookOutlineSchema,
   buildChapterContentSchema,
   buildChapterRevisionOutlineSchema,
+  buildQuizSetSchema,
   buildTextbookOutlineSchema,
   chapterContentSchema,
   textbookOutlineSchema,
@@ -48,17 +49,20 @@ test("schema builders support variable chapter and page counts", () => {
   assert.equal(chapter.properties.pages.maxItems, 6);
 });
 
-test("chapter schema produces three pages, five quizzes, and two cards", () => {
+test("chapter schema produces only three pages", () => {
   assert.equal(chapterContentSchema.properties.pages.minItems, 3);
   assert.equal(chapterContentSchema.properties.pages.maxItems, 3);
   assert.equal(
     chapterContentSchema.properties.pages.items.properties.sources.minItems,
     1,
   );
-  assert.equal(chapterContentSchema.properties.quizzes.minItems, 5);
-  assert.equal(chapterContentSchema.properties.quizzes.maxItems, 5);
-  assert.equal(chapterContentSchema.properties.flashcards.minItems, 2);
-  assert.equal(chapterContentSchema.properties.flashcards.maxItems, 2);
+  assert.deepEqual(chapterContentSchema.required, ["pages"]);
+});
+
+test("quiz schema uses the requested question count", () => {
+  const quizzes = buildQuizSetSchema(12).properties.quizzes;
+  assert.equal(quizzes.minItems, 12);
+  assert.equal(quizzes.maxItems, 12);
 });
 
 test("generated content excludes image blocks", () => {
